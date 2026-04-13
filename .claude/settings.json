@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npm run:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/gregormaclaine/Projects/poker-tracker/src/app/api/players"
+    ]
+  }
+}
