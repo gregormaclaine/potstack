@@ -3,14 +3,12 @@
 import {
   BarChart,
   Bar,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { formatCurrency } from "@/lib/formatters";
 import type { TopPlayer } from "@/types";
 
 interface TopPlayersChartProps {
@@ -21,7 +19,7 @@ export default function TopPlayersChart({ data }: TopPlayersChartProps) {
   if (data.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-zinc-500">
-        No data yet
+        No players recorded yet
       </div>
     );
   }
@@ -31,15 +29,16 @@ export default function TopPlayersChart({ data }: TopPlayersChartProps) {
       <BarChart
         layout="vertical"
         data={data}
-        margin={{ top: 5, right: 70, left: 10, bottom: 5 }}
+        margin={{ top: 5, right: 50, left: 10, bottom: 5 }}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
         <XAxis
           type="number"
-          tickFormatter={(v) => formatCurrency(v)}
+          allowDecimals={false}
           tick={{ fill: "#71717a", fontSize: 11 }}
           axisLine={false}
           tickLine={false}
+          label={{ value: "sessions", position: "insideRight", offset: -5, fill: "#52525b", fontSize: 10 }}
         />
         <YAxis
           type="category"
@@ -56,17 +55,9 @@ export default function TopPlayersChart({ data }: TopPlayersChartProps) {
             borderRadius: 8,
             fontSize: 12,
           }}
-          formatter={(value) => [formatCurrency(Number(value)), "Profit"]}
+          formatter={(value) => [`${value} sessions`, "Played together"]}
         />
-        <Bar dataKey="totalProfit" radius={[0, 3, 3, 0]}>
-          {data.map((entry, i) => (
-            <Cell
-              key={i}
-              fill={entry.totalProfit >= 0 ? "#10b981" : "#ef4444"}
-              fillOpacity={0.85}
-            />
-          ))}
-        </Bar>
+        <Bar dataKey="sessions" fill="#6366f1" fillOpacity={0.85} radius={[0, 3, 3, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

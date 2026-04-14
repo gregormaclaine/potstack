@@ -26,6 +26,8 @@ export default async function EditSessionPage({ params }: PageProps) {
     date: session.date.toISOString().slice(0, 10),
     location: session.location ?? undefined,
     notes: session.notes ?? undefined,
+    buyIn: session.buyIn,
+    cashOut: session.cashOut,
     players: session.players.map((sp) => ({
       playerId: sp.playerId,
       playerName: sp.player.name,
@@ -37,11 +39,7 @@ export default async function EditSessionPage({ params }: PageProps) {
   return (
     <PageWrapper className="max-w-2xl">
       <h1 className="mb-6 text-2xl font-bold text-zinc-100">Edit Session</h1>
-      <SessionForm
-        mode="edit"
-        sessionId={session.id}
-        defaultValues={defaultValues}
-      />
+      <SessionForm mode="edit" sessionId={session.id} defaultValues={defaultValues} />
     </PageWrapper>
   );
 }

@@ -18,7 +18,7 @@ export default async function PlayersPage() {
     name: p.name,
     createdAt: p.createdAt.toISOString(),
     sessionCount: p.sessions.length,
-    totalProfit: p.sessions.reduce((sum, s) => sum + s.profit, 0),
+    totalProfit: p.sessions.reduce((sum, s) => sum + (s.profit ?? 0), 0),
   }));
 
   return (

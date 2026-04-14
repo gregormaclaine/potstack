@@ -23,6 +23,9 @@ model Session {
   date      DateTime
   location  String?
   notes     String?
+  buyIn     Float
+  cashOut   Float
+  profit    Float
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   players   SessionPlayer[]
@@ -30,9 +33,9 @@ model Session {
 
 model SessionPlayer {
   id        Int     @id @default(autoincrement())
-  buyIn     Float
-  cashOut   Float
-  profit    Float
+  buyIn     Float?
+  cashOut   Float?
+  profit    Float?
 
   session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   sessionId Int

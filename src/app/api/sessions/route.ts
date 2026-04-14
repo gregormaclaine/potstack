@@ -7,14 +7,17 @@ function serializeSession(session: {
   date: Date;
   location: string | null;
   notes: string | null;
+  buyIn: number;
+  cashOut: number;
+  profit: number;
   createdAt: Date;
   updatedAt: Date;
   players: Array<{
     id: number;
     playerId: number;
-    buyIn: number;
-    cashOut: number;
-    profit: number;
+    buyIn: number | null;
+    cashOut: number | null;
+    profit: number | null;
     player: { name: string };
   }>;
 }): SessionWithPlayers {
@@ -23,6 +26,9 @@ function serializeSession(session: {
     date: session.date.toISOString(),
     location: session.location,
     notes: session.notes,
+    buyIn: session.buyIn,
+    cashOut: session.cashOut,
+    profit: session.profit,
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
     players: session.players.map((sp) => ({
@@ -33,9 +39,6 @@ function serializeSession(session: {
       cashOut: sp.cashOut,
       profit: sp.profit,
     })),
-    totalBuyIn: session.players.reduce((sum, sp) => sum + sp.buyIn, 0),
-    totalCashOut: session.players.reduce((sum, sp) => sum + sp.cashOut, 0),
-    totalProfit: session.players.reduce((sum, sp) => sum + sp.profit, 0),
   };
 }
 
@@ -81,9 +84,9 @@ export async function POST(request: NextRequest) {
   if (!body.date) {
     return NextResponse.json({ error: "Date is required" }, { status: 400 });
   }
-  if (!body.players || body.players.length === 0) {
+  if (body.buyIn == null || body.cashOut == null) {
     return NextResponse.json(
-      { error: "At least one player is required" },
+      { error: "Buy-in and cash-out are required" },
       { status: 400 }
     );
   }
@@ -93,14 +96,22 @@ export async function POST(request: NextRequest) {
       date: new Date(body.date),
       location: body.location ?? null,
       notes: body.notes ?? null,
-      players: {
-        create: body.players.map((p) => ({
-          playerId: p.playerId,
-          buyIn: p.buyIn,
-          cashOut: p.cashOut,
-          profit: p.cashOut - p.buyIn,
-        })),
-      },
+      buyIn: body.buyIn,
+      cashOut: body.cashOut,
+      profit: body.cashOut - body.buyIn,
+      players: body.players?.length
+        ? {
+            create: body.players.map((p) => ({
+              playerId: p.playerId,
+              buyIn: p.buyIn ?? null,
+              cashOut: p.cashOut ?? null,
+              profit:
+                p.buyIn != null && p.cashOut != null
+                  ? p.cashOut - p.buyIn
+                  : null,
+            })),
+          }
+        : undefined,
     },
     include: playerInclude,
   });

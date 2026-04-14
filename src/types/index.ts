@@ -13,9 +13,9 @@ export interface SessionPlayerDetail {
   id: number;
   playerId: number;
   playerName: string;
-  buyIn: number;
-  cashOut: number;
-  profit: number;
+  buyIn: number | null;
+  cashOut: number | null;
+  profit: number | null;
 }
 
 export interface SessionWithPlayers {
@@ -23,22 +23,12 @@ export interface SessionWithPlayers {
   date: string;
   location: string | null;
   notes: string | null;
+  buyIn: number;
+  cashOut: number;
+  profit: number;
   createdAt: string;
   updatedAt: string;
   players: SessionPlayerDetail[];
-  totalBuyIn: number;
-  totalCashOut: number;
-  totalProfit: number;
-}
-
-export interface SessionSummary {
-  id: number;
-  date: string;
-  location: string | null;
-  playerCount: number;
-  totalBuyIn: number;
-  totalCashOut: number;
-  totalProfit: number;
 }
 
 export interface ProfitOverTimePoint {
@@ -56,8 +46,8 @@ export interface WinLossPoint {
 export interface TopPlayer {
   playerId: number;
   name: string;
-  totalProfit: number;
   sessions: number;
+  totalProfit: number | null;
 }
 
 export interface DashboardStats {
@@ -77,9 +67,11 @@ export interface CreateSessionBody {
   date: string;
   location?: string;
   notes?: string;
-  players: Array<{
+  buyIn: number;
+  cashOut: number;
+  players?: Array<{
     playerId: number;
-    buyIn: number;
-    cashOut: number;
+    buyIn?: number | null;
+    cashOut?: number | null;
   }>;
 }

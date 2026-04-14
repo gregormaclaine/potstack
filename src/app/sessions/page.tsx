@@ -36,6 +36,9 @@ export default async function SessionsPage({ searchParams }: PageProps) {
     date: s.date.toISOString(),
     location: s.location,
     notes: s.notes,
+    buyIn: s.buyIn,
+    cashOut: s.cashOut,
+    profit: s.profit,
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
     players: s.players.map((sp) => ({
@@ -46,9 +49,6 @@ export default async function SessionsPage({ searchParams }: PageProps) {
       cashOut: sp.cashOut,
       profit: sp.profit,
     })),
-    totalBuyIn: s.players.reduce((sum, sp) => sum + sp.buyIn, 0),
-    totalCashOut: s.players.reduce((sum, sp) => sum + sp.cashOut, 0),
-    totalProfit: s.players.reduce((sum, sp) => sum + sp.profit, 0),
   }));
 
   return (

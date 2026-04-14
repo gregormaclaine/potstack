@@ -17,9 +17,7 @@ interface BuyInVsCashOutChartProps {
   sessions: SessionWithPlayers[];
 }
 
-export default function BuyInVsCashOutChart({
-  sessions,
-}: BuyInVsCashOutChartProps) {
+export default function BuyInVsCashOutChart({ sessions }: BuyInVsCashOutChartProps) {
   if (sessions.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-zinc-500">
@@ -30,8 +28,8 @@ export default function BuyInVsCashOutChart({
 
   const data = sessions.map((s) => ({
     date: s.date,
-    buyIn: s.totalBuyIn,
-    cashOut: s.totalCashOut,
+    buyIn: s.buyIn,
+    cashOut: s.cashOut,
   }));
 
   return (

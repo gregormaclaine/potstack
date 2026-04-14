@@ -30,6 +30,9 @@ export default async function DashboardPage() {
     date: s.date.toISOString(),
     location: s.location,
     notes: s.notes,
+    buyIn: s.buyIn,
+    cashOut: s.cashOut,
+    profit: s.profit,
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
     players: s.players.map((sp) => ({
@@ -40,9 +43,6 @@ export default async function DashboardPage() {
       cashOut: sp.cashOut,
       profit: sp.profit,
     })),
-    totalBuyIn: s.players.reduce((sum, sp) => sum + sp.buyIn, 0),
-    totalCashOut: s.players.reduce((sum, sp) => sum + sp.cashOut, 0),
-    totalProfit: s.players.reduce((sum, sp) => sum + sp.profit, 0),
   }));
 
   const stats = buildDashboardStats(sessions);
@@ -144,7 +144,7 @@ export default async function DashboardPage() {
         </div>
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
           <h2 className="mb-3 text-sm font-semibold text-zinc-300">
-            Top Players by Profit
+            Most Played With
           </h2>
           <TopPlayersChart data={stats.topPlayers} />
         </div>

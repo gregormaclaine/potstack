@@ -45,3 +45,5 @@ planning/
 # SQLite (no longer used)
 prisma/dev.db
 prisma/dev.db-journal
+
+temp/

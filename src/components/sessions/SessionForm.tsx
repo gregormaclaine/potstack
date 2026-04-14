@@ -12,8 +12,8 @@ import { clsx } from "clsx";
 interface PlayerRow {
   playerId: number;
   playerName: string;
-  buyIn: number;
-  cashOut: number;
+  buyIn: number | null;
+  cashOut: number | null;
 }
 
 interface SessionFormProps {
@@ -23,6 +23,8 @@ interface SessionFormProps {
     date: string;
     location?: string;
     notes?: string;
+    buyIn: number;
+    cashOut: number;
     players: PlayerRow[];
   };
 }
@@ -41,31 +43,33 @@ export default function SessionForm({
   );
   const [location, setLocation] = useState(defaultValues?.location ?? "");
   const [notes, setNotes] = useState(defaultValues?.notes ?? "");
+  const [myBuyIn, setMyBuyIn] = useState(defaultValues?.buyIn ?? 0);
+  const [myCashOut, setMyCashOut] = useState(defaultValues?.cashOut ?? 0);
   const [players, setPlayers] = useState<PlayerRow[]>(
     defaultValues?.players ?? []
   );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const totalBuyIn = players.reduce((sum, p) => sum + p.buyIn, 0);
-  const totalCashOut = players.reduce((sum, p) => sum + p.cashOut, 0);
-  const totalProfit = totalCashOut - totalBuyIn;
+  const myProfit = myCashOut - myBuyIn;
 
   function addPlayer(player: { id: number; name: string }) {
     if (players.some((p) => p.playerId === player.id)) return;
     setPlayers((prev) => [
       ...prev,
-      { playerId: player.id, playerName: player.name, buyIn: 0, cashOut: 0 },
+      { playerId: player.id, playerName: player.name, buyIn: null, cashOut: null },
     ]);
   }
 
-  function changePlayerField(
-    index: number,
-    field: "buyIn" | "cashOut",
-    value: number
-  ) {
+  function changePlayerBuyIn(index: number, value: number | null) {
     setPlayers((prev) =>
-      prev.map((p, i) => (i === index ? { ...p, [field]: value } : p))
+      prev.map((p, i) => (i === index ? { ...p, buyIn: value } : p))
+    );
+  }
+
+  function changePlayerCashOut(index: number, value: number | null) {
+    setPlayers((prev) =>
+      prev.map((p, i) => (i === index ? { ...p, cashOut: value } : p))
     );
   }
 
@@ -73,26 +77,25 @@ export default function SessionForm({
     setPlayers((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
-
-    if (players.length === 0) {
-      setError("Add at least one player.");
-      return;
-    }
-
     setLoading(true);
+
     try {
       const body = {
         date,
         location: location.trim() || undefined,
         notes: notes.trim() || undefined,
-        players: players.map((p) => ({
-          playerId: p.playerId,
-          buyIn: p.buyIn,
-          cashOut: p.cashOut,
-        })),
+        buyIn: myBuyIn,
+        cashOut: myCashOut,
+        players: players.length
+          ? players.map((p) => ({
+              playerId: p.playerId,
+              buyIn: p.buyIn,
+              cashOut: p.cashOut,
+            }))
+          : undefined,
       };
 
       const res = await fetch(
@@ -119,6 +122,7 @@ export default function SessionForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Date & Location */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input
           label="Date"
@@ -144,69 +148,98 @@ export default function SessionForm({
         placeholder="Any notes about this session..."
       />
 
-      <div className="space-y-2">
-        <h2 className="text-sm font-medium text-zinc-300">Players</h2>
-        {players.length === 0 && (
-          <p className="rounded-lg border border-dashed border-zinc-700 py-6 text-center text-sm text-zinc-500">
-            No players added yet. Search below to add players.
-          </p>
-        )}
-        <div className="space-y-2">
-          {players.map((player, i) => (
-            <PlayerRowInput
-              key={player.playerId}
-              index={i}
-              playerName={player.playerName}
-              buyIn={player.buyIn}
-              cashOut={player.cashOut}
-              onChange={changePlayerField}
-              onRemove={removePlayer}
-            />
-          ))}
+      {/* My Results */}
+      <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5">
+        <h2 className="mb-4 text-sm font-semibold text-zinc-200">Your Results</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-300">
+              Buy-in
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
+                £
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                value={myBuyIn}
+                onChange={(e) => setMyBuyIn(Number(e.target.value))}
+                className="w-full rounded-md border border-zinc-700 bg-zinc-800 py-2 pl-7 pr-3 text-right text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-300">
+              Cash-out
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
+                £
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                value={myCashOut}
+                onChange={(e) => setMyCashOut(Number(e.target.value))}
+                className="w-full rounded-md border border-zinc-700 bg-zinc-800 py-2 pl-7 pr-3 text-right text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
         </div>
+
+        <div className="mt-4 flex items-center justify-between border-t border-zinc-800 pt-4">
+          <span className="text-sm text-zinc-500">Net profit</span>
+          <span
+            className={clsx(
+              "text-lg font-bold tabular-nums",
+              myProfit > 0 && "text-emerald-400",
+              myProfit < 0 && "text-red-400",
+              myProfit === 0 && "text-zinc-400"
+            )}
+          >
+            {myProfit > 0 ? "+" : ""}
+            {formatCurrency(myProfit)}
+          </span>
+        </div>
+      </div>
+
+      {/* Players (optional) */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-zinc-200">
+            Who did you play with?
+          </h2>
+          <span className="text-xs text-zinc-500">optional</span>
+        </div>
+
+        {players.length > 0 && (
+          <div className="space-y-2">
+            {players.map((player, i) => (
+              <PlayerRowInput
+                key={player.playerId}
+                index={i}
+                playerName={player.playerName}
+                buyIn={player.buyIn}
+                cashOut={player.cashOut}
+                onChangeBuyIn={changePlayerBuyIn}
+                onChangeCashOut={changePlayerCashOut}
+                onRemove={removePlayer}
+              />
+            ))}
+          </div>
+        )}
 
         <PlayerSearchCombobox
           onSelect={addPlayer}
           excludeIds={players.map((p) => p.playerId)}
-          placeholder="Search for a player or add new..."
+          placeholder="Search players or add new..."
         />
       </div>
-
-      {players.length > 0 && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-          <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-zinc-500">
-            Session Summary
-          </h3>
-          <div className="flex gap-6 text-sm">
-            <div>
-              <span className="text-zinc-500">Total Buy-in</span>
-              <p className="font-semibold text-zinc-100">
-                {formatCurrency(totalBuyIn)}
-              </p>
-            </div>
-            <div>
-              <span className="text-zinc-500">Total Cash-out</span>
-              <p className="font-semibold text-zinc-100">
-                {formatCurrency(totalCashOut)}
-              </p>
-            </div>
-            <div>
-              <span className="text-zinc-500">Net</span>
-              <p
-                className={clsx(
-                  "font-bold",
-                  totalProfit > 0 && "text-emerald-400",
-                  totalProfit < 0 && "text-red-400",
-                  totalProfit === 0 && "text-zinc-400"
-                )}
-              >
-                {totalProfit > 0 ? "+" : ""}
-                {formatCurrency(totalProfit)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
