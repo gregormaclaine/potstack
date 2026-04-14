@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { buildDashboardStats } from "@/lib/stats";
+import { auth } from "@/auth";
+import { buildDashboardStats, filterSessionsByTimeline } from "@/lib/stats";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import PageWrapper from "@/components/layout/PageWrapper";
 import StatCard from "@/components/dashboard/StatCard";
@@ -9,14 +10,32 @@ import WinLossBarChart from "@/components/dashboard/WinLossBarChart";
 import ProfitSpreadChart from "@/components/dashboard/ProfitSpreadChart";
 import TopPlayersChart from "@/components/dashboard/TopPlayersChart";
 import SessionBreakdownTable from "@/components/dashboard/SessionBreakdownTable";
+import TimelineSelector from "@/components/dashboard/TimelineSelector";
 import Button from "@/components/ui/Button";
 import type { SessionWithPlayers } from "@/types";
+import type { Timeline } from "@/components/dashboard/TimelineSelector";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const userSession = await auth();
+  const userId = Number(userSession!.user!.id);
+
+  const { timeline: timelineParam } = await searchParams;
+  const timeline: Timeline =
+    timelineParam === "ytd" ||
+    timelineParam === "last-3-months" ||
+    timelineParam === "this-month"
+      ? timelineParam
+      : "all";
+
   const raw = await prisma.session.findMany({
-    orderBy: { date: "asc" },
+    where: { userId },
+    orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     include: {
       players: {
         include: { player: { select: { name: true } } },
@@ -25,7 +44,7 @@ export default async function DashboardPage() {
     },
   });
 
-  const sessions: SessionWithPlayers[] = raw.map((s) => ({
+  const allSessions: SessionWithPlayers[] = raw.map((s) => ({
     id: s.id,
     date: s.date.toISOString(),
     location: s.location,
@@ -45,6 +64,7 @@ export default async function DashboardPage() {
     })),
   }));
 
+  const sessions = filterSessionsByTimeline(allSessions, timeline);
   const stats = buildDashboardStats(sessions);
 
   const profitTrend =
@@ -57,8 +77,9 @@ export default async function DashboardPage() {
   if (sessions.length === 0) {
     return (
       <PageWrapper>
-        <div className="mb-6">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold text-zinc-100">Dashboard</h1>
+          <TimelineSelector current={timeline} />
         </div>
         <div className="rounded-xl border border-dashed border-zinc-700 py-20 text-center">
           <p className="text-lg font-medium text-zinc-400">
@@ -77,11 +98,14 @@ export default async function DashboardPage() {
 
   return (
     <PageWrapper>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-zinc-100">Dashboard</h1>
-        <Link href="/sessions/new">
-          <Button size="sm">New Session</Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <TimelineSelector current={timeline} />
+          <Link href="/sessions/new">
+            <Button size="sm">New Session</Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stat cards */}

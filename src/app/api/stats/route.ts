@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 import { buildDashboardStats } from "@/lib/stats";
 import type { SessionWithPlayers } from "@/types";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = Number(session.user.id);
+
   const raw = await prisma.session.findMany({
+    where: { userId },
     orderBy: { date: "asc" },
     include: {
       players: {

@@ -1,14 +1,18 @@
 import { useState, useEffect } from "react";
 import Badge from "@/components/ui/Badge";
+import type { LinkStatus } from "@/types";
 
 interface PlayerRowInputProps {
   index: number;
   playerName: string;
   buyIn: number | null;
   cashOut: number | null;
+  linkStatus?: LinkStatus | null;
+  linkedUsername?: string;
   onChangeBuyIn: (index: number, value: number | null) => void;
   onChangeCashOut: (index: number, value: number | null) => void;
   onRemove: (index: number) => void;
+  onLink: (index: number) => void;
 }
 
 // Controlled currency input: allows free typing, selects all on focus,
@@ -54,14 +58,77 @@ function CurrencyInput({
   );
 }
 
+function LinkStatusChip({
+  status,
+  username,
+  onLink,
+}: {
+  status?: LinkStatus | null;
+  username?: string;
+  onLink: () => void;
+}) {
+  if (status === "ACCEPTED") {
+    return (
+      <button
+        type="button"
+        onClick={onLink}
+        title={`Linked to @${username}`}
+        className="flex items-center gap-1 rounded-full bg-emerald-600/20 px-2 py-0.5 text-xs font-medium text-emerald-400 hover:bg-emerald-600/30 transition-colors"
+      >
+        <span>⇄</span>
+        <span>@{username}</span>
+      </button>
+    );
+  }
+  if (status === "PENDING") {
+    return (
+      <button
+        type="button"
+        onClick={onLink}
+        title={`Pending link request to @${username}`}
+        className="flex items-center gap-1 rounded-full bg-yellow-600/20 px-2 py-0.5 text-xs font-medium text-yellow-400 hover:bg-yellow-600/30 transition-colors"
+      >
+        <span>⋯</span>
+        <span>@{username}</span>
+      </button>
+    );
+  }
+  if (status === "REJECTED") {
+    return (
+      <button
+        type="button"
+        onClick={onLink}
+        title="Link request was rejected — click to manage"
+        className="flex items-center gap-1 rounded-full bg-red-600/20 px-2 py-0.5 text-xs font-medium text-red-400 hover:bg-red-600/30 transition-colors"
+      >
+        <span>✕</span>
+        <span>@{username}</span>
+      </button>
+    );
+  }
+  // No link
+  return (
+    <button
+      type="button"
+      onClick={onLink}
+      className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors whitespace-nowrap"
+    >
+      + Link
+    </button>
+  );
+}
+
 export default function PlayerRowInput({
   index,
   playerName,
   buyIn,
   cashOut,
+  linkStatus,
+  linkedUsername,
   onChangeBuyIn,
   onChangeCashOut,
   onRemove,
+  onLink,
 }: PlayerRowInputProps) {
   const tracking = buyIn !== null;
   const profit = tracking ? (cashOut ?? 0) - buyIn : null;
@@ -81,6 +148,14 @@ export default function PlayerRowInput({
       <span className="min-w-0 flex-1 truncate font-medium text-zinc-100">
         {playerName}
       </span>
+
+      <LinkStatusChip
+        status={linkStatus}
+        username={linkedUsername}
+        onLink={() => onLink(index)}
+      />
+
+      <span className="text-zinc-700">|</span>
 
       {tracking ? (
         <>

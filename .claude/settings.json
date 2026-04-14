@@ -1,14 +1,22 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install:*)",
-      "Bash(npx prisma:*)",
-      "Bash(npm run:*)",
-      "Bash(npx tsx:*)",
-      "Bash(npx tsc:*)"
-    ],
-    "additionalDirectories": [
-      "/Users/gregormaclaine/Projects/poker-tracker/src/app/api/players"
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(psql:*)",
+      "Bash(openssl rand:*)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay /System/Library/Sounds/Glass.aiff"
+          }
+        ]
+      }
     ]
   }
 }

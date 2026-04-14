@@ -21,6 +21,11 @@ export function formatDate(date: string | Date, fmt = "d MMM yyyy"): string {
   return format(d, fmt);
 }
 
+export function formatTime(date: string | Date): string {
+  const d = typeof date === "string" ? parseISO(date) : date;
+  return format(d, "HH:mm");
+}
+
 export function formatPercent(value: number): string {
   return `${Math.round(value)}%`;
 }

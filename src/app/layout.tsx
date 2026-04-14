@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { SessionProvider } from "next-auth/react";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
+import PostHogProvider from "@/components/PostHogProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -9,8 +11,16 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Poker Tracker",
+  title: "PotStack",
   description: "Track your poker sessions and stats",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32", type: "image/x-icon" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({
@@ -19,13 +29,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} h-full antialiased`}
-    >
+    <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full bg-zinc-950 text-zinc-100">
-        <Navbar />
-        {children}
+        <SessionProvider>
+          <PostHogProvider>
+            <Navbar />
+            {children}
+          </PostHogProvider>
+        </SessionProvider>
       </body>
     </html>
   );

@@ -11,36 +11,175 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id                         Int             @id @default(autoincrement())
+  username                   String          @unique
+  passwordHash               String
+  createdAt                  DateTime        @default(now())
+  breakdownLastRefreshedAt   DateTime?
+  sessions                   Session[]
+  players                    Player[]
+  playerGroups               PlayerGroup[]
+  ownerLinks                 PlayerLink[]    @relation("OwnerLinks")
+  linkedLinks                PlayerLink[]    @relation("LinkedLinks")
+  sessionInvites             SessionInvite[] @relation("ReceivedInvites")
+  breakdownStats             BreakdownStats[]
+  notifications              Notification[]
+}
+
+model PlayerGroup {
+  id      Int      @id @default(autoincrement())
+  name    String
+  color   String   @default("zinc")
+  players Player[]
+  userId  Int
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+}
+
 model Player {
   id        Int             @id @default(autoincrement())
-  name      String          @unique
+  name      String
   createdAt DateTime        @default(now())
   sessions  SessionPlayer[]
+  groupId   Int?
+  group     PlayerGroup?    @relation(fields: [groupId], references: [id])
+  userId    Int
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ownerLinks        PlayerLink[]        @relation("OwnerPlayer")
+  linkedLinks       PlayerLink[]        @relation("LinkedPlayer")
+  fromEquivalences  PlayerEquivalence[] @relation("FromEquivalences")
+  toEquivalences    PlayerEquivalence[] @relation("ToEquivalences")
+
+  @@unique([userId, name])
 }
 
 model Session {
-  id        Int             @id @default(autoincrement())
-  date      DateTime
-  location  String?
-  notes     String?
-  buyIn     Float
-  cashOut   Float
-  profit    Float
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  players   SessionPlayer[]
+  id            Int             @id @default(autoincrement())
+  date          DateTime
+  location      String?
+  notes         String?
+  buyIn         Float
+  cashOut       Float
+  profit        Float
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  players       SessionPlayer[]
+  userId        Int
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invites       SessionInvite[]
+  notifications Notification[]
 }
 
 model SessionPlayer {
-  id        Int     @id @default(autoincrement())
+  id        Int            @id @default(autoincrement())
   buyIn     Float?
   cashOut   Float?
   profit    Float?
 
-  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session   Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   sessionId Int
-  player    Player  @relation(fields: [playerId], references: [id])
+  player    Player         @relation(fields: [playerId], references: [id])
   playerId  Int
+  invite    SessionInvite?
 
   @@unique([sessionId, playerId])
+}
+
+model PlayerLink {
+  id              Int             @id @default(autoincrement())
+  status          String          @default("PENDING")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  ownerPlayerId   Int             @unique
+  ownerPlayer     Player          @relation("OwnerPlayer", fields: [ownerPlayerId], references: [id], onDelete: Cascade)
+
+  ownerUserId     Int
+  ownerUser       User            @relation("OwnerLinks", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  linkedUserId    Int
+  linkedUser      User            @relation("LinkedLinks", fields: [linkedUserId], references: [id], onDelete: Cascade)
+
+  linkedPlayerId  Int?            @unique
+  linkedPlayer    Player?         @relation("LinkedPlayer", fields: [linkedPlayerId], references: [id])
+
+  sessionInvites  SessionInvite[]
+  equivalences    PlayerEquivalence[]
+  notifications   Notification[]
+
+  @@unique([ownerPlayerId, linkedUserId])
+}
+
+model PlayerEquivalence {
+  id           Int        @id @default(autoincrement())
+  fromPlayerId Int
+  fromPlayer   Player     @relation("FromEquivalences", fields: [fromPlayerId], references: [id], onDelete: Cascade)
+  toPlayerId   Int
+  toPlayer     Player     @relation("ToEquivalences", fields: [toPlayerId], references: [id], onDelete: Cascade)
+  linkId       Int
+  link         PlayerLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@unique([fromPlayerId, linkId])
+}
+
+model SessionInvite {
+  id              Int           @id @default(autoincrement())
+  status          String        @default("PENDING")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  sessionId       Int
+  session         Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  sessionPlayerId Int           @unique
+  sessionPlayer   SessionPlayer @relation(fields: [sessionPlayerId], references: [id], onDelete: Cascade)
+
+  linkId          Int
+  link            PlayerLink    @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  inviteeId       Int
+  invitee         User          @relation("ReceivedInvites", fields: [inviteeId], references: [id], onDelete: Cascade)
+  notifications   Notification[]
+
+  @@unique([sessionId, linkId])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Nullable FKs — nulled via SetNull when the referenced record is deleted.
+  // Presence/absence drives action-button visibility and session link rendering.
+  sessionId Int?
+  session   Session?      @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  linkId    Int?
+  link      PlayerLink?   @relation(fields: [linkId], references: [id], onDelete: SetNull)
+
+  inviteId  Int?
+  invite    SessionInvite? @relation(fields: [inviteId], references: [id], onDelete: SetNull)
+
+  data      Json
+}
+
+model BreakdownStats {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entityType        String   // "player" | "group"
+  entityId          Int      // playerId, groupId, or -1 for Ungrouped
+  winRateCILow      Float
+  winRateCIHigh     Float
+  profitProbability Float
+  expectedValue     Float
+  sessionCount      Int
+  computedAt        DateTime @updatedAt
+
+  @@unique([userId, entityType, entityId])
 }

@@ -1,19 +1,30 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import PlayerRowInput from "./PlayerRowInput";
 import PlayerSearchCombobox from "@/components/players/PlayerSearchCombobox";
+import LinkPlayerModal from "@/components/players/LinkPlayerModal";
 import { formatCurrency } from "@/lib/formatters";
 import { clsx } from "clsx";
+import type { LinkStatus, PlayerLinkSummary } from "@/types";
 
 interface PlayerRow {
   playerId: number;
   playerName: string;
   buyIn: number | null;
   cashOut: number | null;
+  /** Link from this player to another user account. */
+  linkId?: number;
+  linkStatus?: LinkStatus | null;
+  linkedUsername?: string;
+  /**
+   * True when the link was created during this form session.
+   * These players should not be cleaned up as orphans even if removed.
+   */
+  newlyLinked?: boolean;
 }
 
 interface SessionFormProps {
@@ -55,12 +66,47 @@ export default function SessionForm({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Index of the player row currently open in the link modal, or null if closed.
+  const [linkingIndex, setLinkingIndex] = useState<number | null>(null);
+
+  // Whether to send session invites to linked players (auto-checked).
+  const [sendInvites, setSendInvites] = useState(true);
+
+  // Map of playerId → PlayerLinkSummary for all sent links (preloaded on mount).
+  const [sentLinks, setSentLinks] = useState<Map<number, PlayerLinkSummary>>(new Map());
+
   // Players that may have become orphaned (0 sessions) and should be deleted:
   // - players removed from the form during editing
   // - newly created players (orphaned if session is cancelled without saving)
   // The DELETE API rejects deletion if a player still has sessions, so it is safe
   // to call for any candidate regardless of whether they were recently created.
   const playersToCheckRef = useRef(new Set<number>());
+
+  // Fetch all sent links so we know which players are already linked.
+  useEffect(() => {
+    fetch("/api/links?type=sent")
+      .then((r) => r.json())
+      .then((data: { links: PlayerLinkSummary[] }) => {
+        const map = new Map<number, PlayerLinkSummary>();
+        for (const link of data.links) map.set(link.playerId, link);
+        setSentLinks(map);
+        // Hydrate any default player rows with link info
+        setPlayers((prev) =>
+          prev.map((p) => {
+            if (p.linkId != null) return p; // already populated
+            const link = map.get(p.playerId);
+            if (!link) return p;
+            return {
+              ...p,
+              linkId: link.id,
+              linkStatus: link.status,
+              linkedUsername: link.linkedUsername,
+            };
+          })
+        );
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     return () => cleanupOrphans();
@@ -78,9 +124,18 @@ export default function SessionForm({
 
   function addPlayer(player: { id: number; name: string }) {
     if (players.some((p) => p.playerId === player.id)) return;
+    const link = sentLinks.get(player.id);
     setPlayers((prev) => [
       ...prev,
-      { playerId: player.id, playerName: player.name, buyIn: null, cashOut: null },
+      {
+        playerId: player.id,
+        playerName: player.name,
+        buyIn: null,
+        cashOut: null,
+        linkId: link?.id,
+        linkStatus: link?.status ?? null,
+        linkedUsername: link?.linkedUsername,
+      },
     ]);
   }
 
@@ -97,11 +152,67 @@ export default function SessionForm({
   }
 
   function removePlayer(index: number) {
-    playersToCheckRef.current.add(players[index].playerId);
+    const player = players[index];
+    // Don't try to delete players that had a link created during this session —
+    // the link request is now attached to them so they should remain.
+    if (!player.newlyLinked) {
+      playersToCheckRef.current.add(player.playerId);
+    }
     setPlayers((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleLinkCreated(link: PlayerLinkSummary) {
+    // Update sentLinks map
+    setSentLinks((prev) => {
+      const next = new Map(prev);
+      next.set(link.playerId, link);
+      return next;
+    });
+    // Update the player row
+    setPlayers((prev) =>
+      prev.map((p) => {
+        if (p.playerId !== link.playerId) return p;
+        // Remove from orphan cleanup — this player now has an active link request
+        playersToCheckRef.current.delete(p.playerId);
+        return {
+          ...p,
+          linkId: link.id,
+          linkStatus: link.status,
+          linkedUsername: link.linkedUsername,
+          newlyLinked: true,
+        };
+      })
+    );
+  }
+
+  function handleLinkRemoved(playerId: number) {
+    setSentLinks((prev) => {
+      const next = new Map(prev);
+      next.delete(playerId);
+      return next;
+    });
+    setPlayers((prev) =>
+      prev.map((p) => {
+        if (p.playerId !== playerId) return p;
+        return { ...p, linkId: undefined, linkStatus: null, linkedUsername: undefined, newlyLinked: false };
+      })
+    );
+  }
+
+  // Count of players that will receive a session invite.
+  const inviteCount = players.filter(
+    (p) => p.linkStatus === "ACCEPTED" || p.newlyLinked
+  ).length;
+
+  // IDs of players whose PENDING link was newly created during this form.
+  const pendingLinkPlayerIds = players
+    .filter((p) => p.newlyLinked && p.linkStatus === "PENDING")
+    .map((p) => p.playerId);
+
+  const linkingPlayer =
+    linkingIndex !== null ? players[linkingIndex] ?? null : null;
+
+  async function handleSubmit(e: SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -120,6 +231,8 @@ export default function SessionForm({
               cashOut: p.cashOut,
             }))
           : undefined,
+        skipInvites: !sendInvites,
+        pendingLinkPlayerIds: pendingLinkPlayerIds.length ? pendingLinkPlayerIds : undefined,
       };
 
       const res = await fetch(
@@ -148,163 +261,212 @@ export default function SessionForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
-      className="space-y-6"
-    >
-      {/* Date & Location */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <>
+      <form
+        onSubmit={handleSubmit}
+        onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+        className="space-y-6"
+      >
+        {/* Date & Location */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Input
+            label="Date"
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            required
+          />
+          <Input
+            label="Location (optional)"
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="e.g. Mike's place"
+          />
+        </div>
+
         <Input
-          label="Date"
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          required
-        />
-        <Input
-          label="Location (optional)"
+          label="Notes (optional)"
           type="text"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          placeholder="e.g. Mike's place"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Any notes about this session..."
         />
-      </div>
 
-      <Input
-        label="Notes (optional)"
-        type="text"
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        placeholder="Any notes about this session..."
-      />
-
-      {/* My Results */}
-      <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5">
-        <h2 className="mb-4 text-sm font-semibold text-zinc-200">Your Results</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-300">
-              Buy-in
-            </label>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
-                £
-              </span>
-              <input
-                type="text"
-                inputMode="decimal"
-                required
-                value={rawBuyIn}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (/^\d*\.?\d*$/.test(v)) setRawBuyIn(v);
-                }}
-                onFocus={(e) => e.target.select()}
-                onBlur={() => {
-                  const num = parseFloat(rawBuyIn);
-                  const final = isNaN(num) ? 0 : num;
-                  setRawBuyIn(String(final));
-                  setMyBuyIn(final);
-                }}
-                className="w-full rounded-md border border-zinc-700 bg-zinc-800 py-2 pl-7 pr-3 text-right text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
+        {/* My Results */}
+        <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5">
+          <h2 className="mb-4 text-sm font-semibold text-zinc-200">Your Results</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-300">
+                Buy-in
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
+                  £
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  required
+                  value={rawBuyIn}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (/^\d*\.?\d*$/.test(v)) setRawBuyIn(v);
+                  }}
+                  onFocus={(e) => e.target.select()}
+                  onBlur={() => {
+                    const num = parseFloat(rawBuyIn);
+                    const final = isNaN(num) ? 0 : num;
+                    setRawBuyIn(String(final));
+                    setMyBuyIn(final);
+                  }}
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-800 py-2 pl-7 pr-3 text-right text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-300">
+                Cash-out
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
+                  £
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  required
+                  value={rawCashOut}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (/^\d*\.?\d*$/.test(v)) setRawCashOut(v);
+                  }}
+                  onFocus={(e) => e.target.select()}
+                  onBlur={() => {
+                    const num = parseFloat(rawCashOut);
+                    const final = isNaN(num) ? 0 : num;
+                    setRawCashOut(String(final));
+                    setMyCashOut(final);
+                  }}
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-800 py-2 pl-7 pr-3 text-right text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
             </div>
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-300">
-              Cash-out
-            </label>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
-                £
-              </span>
-              <input
-                type="text"
-                inputMode="decimal"
-                required
-                value={rawCashOut}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (/^\d*\.?\d*$/.test(v)) setRawCashOut(v);
-                }}
-                onFocus={(e) => e.target.select()}
-                onBlur={() => {
-                  const num = parseFloat(rawCashOut);
-                  const final = isNaN(num) ? 0 : num;
-                  setRawCashOut(String(final));
-                  setMyCashOut(final);
-                }}
-                className="w-full rounded-md border border-zinc-700 bg-zinc-800 py-2 pl-7 pr-3 text-right text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
+
+          <div className="mt-4 flex items-center justify-between border-t border-zinc-800 pt-4">
+            <span className="text-sm text-zinc-500">Net profit</span>
+            <span
+              className={clsx(
+                "text-lg font-bold tabular-nums",
+                myProfit > 0 && "text-emerald-400",
+                myProfit < 0 && "text-red-400",
+                myProfit === 0 && "text-zinc-400"
+              )}
+            >
+              {myProfit > 0 ? "+" : ""}
+              {formatCurrency(myProfit)}
+            </span>
+          </div>
+        </div>
+
+        {/* Players (optional) */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-zinc-200">
+              Who did you play with?
+            </h2>
+            <span className="text-xs text-zinc-500">optional</span>
+          </div>
+
+          {players.length > 0 && (
+            <div className="space-y-2">
+              {players.map((player, i) => (
+                <PlayerRowInput
+                  key={player.playerId}
+                  index={i}
+                  playerName={player.playerName}
+                  buyIn={player.buyIn}
+                  cashOut={player.cashOut}
+                  linkStatus={player.linkStatus}
+                  linkedUsername={player.linkedUsername}
+                  onChangeBuyIn={changePlayerBuyIn}
+                  onChangeCashOut={changePlayerCashOut}
+                  onRemove={removePlayer}
+                  onLink={setLinkingIndex}
+                />
+              ))}
             </div>
-          </div>
+          )}
+
+          <PlayerSearchCombobox
+            onSelect={addPlayer}
+            onPlayerCreated={(id) => playersToCheckRef.current.add(id)}
+            excludeIds={players.map((p) => p.playerId)}
+            placeholder="Search players or add new..."
+          />
         </div>
 
-        <div className="mt-4 flex items-center justify-between border-t border-zinc-800 pt-4">
-          <span className="text-sm text-zinc-500">Net profit</span>
-          <span
-            className={clsx(
-              "text-lg font-bold tabular-nums",
-              myProfit > 0 && "text-emerald-400",
-              myProfit < 0 && "text-red-400",
-              myProfit === 0 && "text-zinc-400"
-            )}
-          >
-            {myProfit > 0 ? "+" : ""}
-            {formatCurrency(myProfit)}
-          </span>
-        </div>
-      </div>
-
-      {/* Players (optional) */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-zinc-200">
-            Who did you play with?
-          </h2>
-          <span className="text-xs text-zinc-500">optional</span>
-        </div>
-
-        {players.length > 0 && (
-          <div className="space-y-2">
-            {players.map((player, i) => (
-              <PlayerRowInput
-                key={player.playerId}
-                index={i}
-                playerName={player.playerName}
-                buyIn={player.buyIn}
-                cashOut={player.cashOut}
-                onChangeBuyIn={changePlayerBuyIn}
-                onChangeCashOut={changePlayerCashOut}
-                onRemove={removePlayer}
-              />
-            ))}
-          </div>
+        {/* Send invites checkbox */}
+        {inviteCount > 0 && (
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 hover:border-zinc-600 transition-colors">
+            <input
+              type="checkbox"
+              checked={sendInvites}
+              onChange={(e) => setSendInvites(e.target.checked)}
+              className="h-4 w-4 accent-emerald-500 cursor-pointer"
+            />
+            <span className="text-sm text-zinc-300">
+              Share this session with{" "}
+              <span className="font-medium text-zinc-100">
+                {inviteCount} linked player{inviteCount !== 1 ? "s" : ""}
+              </span>
+            </span>
+          </label>
         )}
 
-        <PlayerSearchCombobox
-          onSelect={addPlayer}
-          onPlayerCreated={(id) => playersToCheckRef.current.add(id)}
-          excludeIds={players.map((p) => p.playerId)}
-          placeholder="Search players or add new..."
+        {error && <p className="text-sm text-red-400">{error}</p>}
+
+        <div className="flex justify-end gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => router.push(returnUrl)}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" loading={loading}>
+            {mode === "edit" ? "Save Changes" : "Record Session"}
+          </Button>
+        </div>
+      </form>
+
+      {/* Link player modal */}
+      {linkingPlayer !== null && (
+        <LinkPlayerModal
+          player={{ id: linkingPlayer.playerId, name: linkingPlayer.playerName }}
+          existingLink={
+            linkingPlayer.linkId != null
+              ? {
+                  id: linkingPlayer.linkId,
+                  status: linkingPlayer.linkStatus ?? "PENDING",
+                  linkedUsername: linkingPlayer.linkedUsername ?? "",
+                  playerId: linkingPlayer.playerId,
+                }
+              : undefined
+          }
+          onClose={() => setLinkingIndex(null)}
+          onLinked={(link) => {
+            handleLinkCreated(link);
+            setLinkingIndex(null);
+          }}
+          onUnlinked={(playerId) => {
+            handleLinkRemoved(playerId);
+            setLinkingIndex(null);
+          }}
         />
-      </div>
-
-      {error && <p className="text-sm text-red-400">{error}</p>}
-
-      <div className="flex justify-end gap-3">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => router.push(returnUrl)}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" loading={loading}>
-          {mode === "edit" ? "Save Changes" : "Record Session"}
-        </Button>
-      </div>
-    </form>
+      )}
+    </>
   );
 }

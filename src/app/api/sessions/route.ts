@@ -1,55 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { CreateSessionBody, SessionWithPlayers } from "@/types";
-
-function serializeSession(session: {
-  id: number;
-  date: Date;
-  location: string | null;
-  notes: string | null;
-  buyIn: number;
-  cashOut: number;
-  profit: number;
-  createdAt: Date;
-  updatedAt: Date;
-  players: Array<{
-    id: number;
-    playerId: number;
-    buyIn: number | null;
-    cashOut: number | null;
-    profit: number | null;
-    player: { name: string };
-  }>;
-}): SessionWithPlayers {
-  return {
-    id: session.id,
-    date: session.date.toISOString(),
-    location: session.location,
-    notes: session.notes,
-    buyIn: session.buyIn,
-    cashOut: session.cashOut,
-    profit: session.profit,
-    createdAt: session.createdAt.toISOString(),
-    updatedAt: session.updatedAt.toISOString(),
-    players: session.players.map((sp) => ({
-      id: sp.id,
-      playerId: sp.playerId,
-      playerName: sp.player.name,
-      buyIn: sp.buyIn,
-      cashOut: sp.cashOut,
-      profit: sp.profit,
-    })),
-  };
-}
-
-const playerInclude = {
-  players: {
-    include: { player: { select: { name: true } } },
-    orderBy: { player: { name: "asc" as const } },
-  },
-};
+import { auth } from "@/auth";
+import { captureEvent } from "@/lib/posthog";
+import { computeAndSaveBreakdownStats } from "@/lib/computeBreakdownStats";
+import { serializeSession, playerInclude, generateSessionInvites } from "@/lib/sessionUtils";
+import type { CreateSessionBody } from "@/types";
 
 export async function GET(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = Number(session.user.id);
+
   const page = Math.max(1, Number(request.nextUrl.searchParams.get("page") ?? "1"));
   const limit = Math.min(100, Number(request.nextUrl.searchParams.get("limit") ?? "20"));
   const sortBy = request.nextUrl.searchParams.get("sortBy") ?? "date";
@@ -59,8 +22,9 @@ export async function GET(request: NextRequest) {
     sortBy === "date" ? { date: order } : { createdAt: order };
 
   const [total, raw] = await Promise.all([
-    prisma.session.count(),
+    prisma.session.count({ where: { userId } }),
     prisma.session.findMany({
+      where: { userId },
       orderBy,
       skip: (page - 1) * limit,
       take: limit,
@@ -79,6 +43,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = Number(session.user.id);
+
   const body: CreateSessionBody = await request.json();
 
   if (!body.date) {
@@ -91,7 +61,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const session = await prisma.session.create({
+  const dbSession = await prisma.session.create({
     data: {
       date: new Date(body.date),
       location: body.location ?? null,
@@ -99,6 +69,7 @@ export async function POST(request: NextRequest) {
       buyIn: body.buyIn,
       cashOut: body.cashOut,
       profit: body.cashOut - body.buyIn,
+      userId,
       players: body.players?.length
         ? {
             create: body.players.map((p) => ({
@@ -116,5 +87,23 @@ export async function POST(request: NextRequest) {
     include: playerInclude,
   });
 
-  return NextResponse.json({ session: serializeSession(session) }, { status: 201 });
+  // Generate session invites for accepted player links (both directions)
+  if (body.players?.length && !body.skipInvites) {
+    const playerIds = body.players.map((p) => p.playerId);
+    await generateSessionInvites(dbSession.id, userId, playerIds, dbSession.players, body.pendingLinkPlayerIds ?? []);
+  }
+
+  captureEvent(session.user.name ?? `userId[${userId}]`, "session created", {
+    session_id: dbSession.id,
+    buy_in: body.buyIn,
+    cash_out: body.cashOut,
+    profit: body.cashOut - body.buyIn,
+    player_count: body.players?.length ?? 0,
+    has_location: !!body.location,
+    has_notes: !!body.notes,
+  });
+
+  await computeAndSaveBreakdownStats(userId);
+
+  return NextResponse.json({ session: serializeSession(dbSession) }, { status: 201 });
 }

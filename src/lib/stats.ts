@@ -1,11 +1,40 @@
 import type { SessionWithPlayers, DashboardStats, TopPlayer } from "@/types";
+import type { Timeline } from "@/components/dashboard/TimelineSelector";
+
+export function filterSessionsByTimeline(
+  sessions: SessionWithPlayers[],
+  timeline: Timeline
+): SessionWithPlayers[] {
+  if (timeline === "all") return sessions;
+
+  const now = new Date();
+  let start: Date;
+  let end: Date = now;
+
+  if (timeline === "ytd") {
+    start = new Date(now.getFullYear(), 0, 1);
+  } else if (timeline === "last-3-months") {
+    start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  } else {
+    // this-month
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  }
+
+  return sessions.filter((s) => {
+    const d = new Date(s.date);
+    return d >= start && d <= end;
+  });
+}
 
 export function buildDashboardStats(
   sessions: SessionWithPlayers[]
 ): DashboardStats {
-  const sorted = [...sessions].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  const sorted = [...sessions].sort((a, b) => {
+    const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+    if (dateDiff !== 0) return dateDiff;
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
 
   const totalSessions = sorted.length;
   const totalProfit = sorted.reduce((sum, s) => sum + s.profit, 0);
@@ -19,7 +48,7 @@ export function buildDashboardStats(
   const biggestLoss = profits.length > 0 ? Math.min(...profits) : 0;
 
   let cumulative = 0;
-  const profitOverTime = sorted.map((s) => {
+  const profitPoints = sorted.map((s) => {
     cumulative += s.profit;
     return {
       date: s.date,
@@ -27,6 +56,20 @@ export function buildDashboardStats(
       cumulativeProfit: cumulative,
     };
   });
+
+  const profitOverTime =
+    profitPoints.length > 0
+      ? [
+          {
+            date: new Date(
+              new Date(profitPoints[0].date).getTime() - 86400000
+            ).toISOString(),
+            sessionProfit: 0,
+            cumulativeProfit: 0,
+          },
+          ...profitPoints,
+        ]
+      : profitPoints;
 
   const winLossPerSession = sorted.map((s) => ({
     sessionId: s.id,

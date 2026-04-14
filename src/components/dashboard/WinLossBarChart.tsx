@@ -20,21 +20,21 @@ interface WinLossBarChartProps {
 
 function ProfitTooltip({
   active,
-  label,
   payload,
 }: {
   active?: boolean;
   label?: string;
-  payload?: Array<{ value?: number }>;
+  payload?: Array<{ value?: number; payload?: WinLossPoint }>;
 }) {
   if (!active || !payload?.length) return null;
 
   const value = Number(payload[0]?.value ?? 0);
+  const date = payload[0]?.payload?.date;
   const color = value >= 0 ? "#10b981" : "#ef4444";
 
   return (
     <div className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm shadow-lg">
-      <div className="mb-1 text-zinc-400">{formatDate(label as string)}</div>
+      {date && <div className="mb-1 text-zinc-400">{formatDate(date)}</div>}
       <div style={{ color }}>{formatCurrency(value)}</div>
     </div>
   );
@@ -54,8 +54,9 @@ export default function WinLossBarChart({ data }: WinLossBarChartProps) {
       <BarChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
         <XAxis
-          dataKey="date"
-          tickFormatter={(v) => formatDate(v, "d MMM")}
+          dataKey="sessionId"
+          tickFormatter={(v, i) => formatDate(data[i]?.date ?? v, "d MMM")}
+
           tick={{ fill: "#71717a", fontSize: 11 }}
           axisLine={{ stroke: "#27272a" }}
           tickLine={false}
