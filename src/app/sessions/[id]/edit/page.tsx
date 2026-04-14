@@ -5,10 +5,12 @@ import SessionForm from "@/components/sessions/SessionForm";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ page?: string }>;
 }
 
-export default async function EditSessionPage({ params }: PageProps) {
-  const { id } = await params;
+export default async function EditSessionPage({ params, searchParams }: PageProps) {
+  const [{ id }, { page }] = await Promise.all([params, searchParams]);
+  const returnUrl = `/sessions${page && page !== "1" ? `?page=${page}` : ""}`;
 
   const session = await prisma.session.findUnique({
     where: { id: Number(id) },
@@ -39,7 +41,7 @@ export default async function EditSessionPage({ params }: PageProps) {
   return (
     <PageWrapper className="max-w-2xl">
       <h1 className="mb-6 text-2xl font-bold text-zinc-100">Edit Session</h1>
-      <SessionForm mode="edit" sessionId={session.id} defaultValues={defaultValues} />
+      <SessionForm mode="edit" sessionId={session.id} defaultValues={defaultValues} returnUrl={returnUrl} />
     </PageWrapper>
   );
 }

@@ -6,7 +6,7 @@ import PageWrapper from "@/components/layout/PageWrapper";
 import StatCard from "@/components/dashboard/StatCard";
 import ProfitLineChart from "@/components/dashboard/ProfitLineChart";
 import WinLossBarChart from "@/components/dashboard/WinLossBarChart";
-import BuyInVsCashOutChart from "@/components/dashboard/BuyInVsCashOutChart";
+import ProfitSpreadChart from "@/components/dashboard/ProfitSpreadChart";
 import TopPlayersChart from "@/components/dashboard/TopPlayersChart";
 import SessionBreakdownTable from "@/components/dashboard/SessionBreakdownTable";
 import Button from "@/components/ui/Button";
@@ -138,9 +138,9 @@ export default async function DashboardPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
           <h2 className="mb-3 text-sm font-semibold text-zinc-300">
-            Buy-in vs Cash-out
+            Profit Spread by Buy-in
           </h2>
-          <BuyInVsCashOutChart sessions={sessions} />
+          <ProfitSpreadChart sessions={sessions} />
         </div>
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
           <h2 className="mb-3 text-sm font-semibold text-zinc-300">

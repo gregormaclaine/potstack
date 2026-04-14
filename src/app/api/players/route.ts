@@ -7,9 +7,9 @@ export async function GET(request: NextRequest) {
 
   const players = await prisma.player.findMany({
     where: search
-      ? { name: { contains: search } }
+      ? { name: { contains: search, mode: "insensitive" } }
       : undefined,
-    orderBy: { name: "asc" },
+    orderBy: { sessions: { _count: "desc" } },
     take: limit,
   });
 

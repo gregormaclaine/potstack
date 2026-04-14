@@ -7,6 +7,7 @@ export interface PlayerBase {
 export interface PlayerWithStats extends PlayerBase {
   sessionCount: number;
   totalProfit: number;
+  avgSessionProfit: number;
 }
 
 export interface SessionPlayerDetail {

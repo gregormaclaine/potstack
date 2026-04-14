@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
@@ -8,6 +8,8 @@ import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import { formatDate, formatCurrency } from "@/lib/formatters";
 import type { SessionWithPlayers } from "@/types";
+
+const SCROLL_KEY = "sessions_scroll";
 
 interface SessionTableProps {
   sessions: SessionWithPlayers[];
@@ -25,6 +27,19 @@ export default function SessionTable({
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem(SCROLL_KEY);
+    if (saved !== null) {
+      sessionStorage.removeItem(SCROLL_KEY);
+      window.scrollTo({ top: parseInt(saved), behavior: "instant" });
+    }
+  }, []);
+
+  function handleEdit(sessionId: number) {
+    sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
+    router.push(`/sessions/${sessionId}/edit?page=${page}`);
+  }
 
   async function confirmDelete(id: number) {
     setDeleting(true);
@@ -82,9 +97,7 @@ export default function SessionTable({
                     <Link href={`/sessions/${session.id}`}>
                       <Button size="sm" variant="ghost">View</Button>
                     </Link>
-                    <Link href={`/sessions/${session.id}/edit`}>
-                      <Button size="sm" variant="secondary">Edit</Button>
-                    </Link>
+                    <Button size="sm" variant="secondary" onClick={() => handleEdit(session.id)}>Edit</Button>
                     <Button size="sm" variant="danger" onClick={() => setDeletingId(session.id)}>
                       Delete
                     </Button>

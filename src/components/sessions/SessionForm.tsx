@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -19,6 +19,7 @@ interface PlayerRow {
 interface SessionFormProps {
   mode: "create" | "edit";
   sessionId?: number;
+  returnUrl?: string;
   defaultValues?: {
     date: string;
     location?: string;
@@ -32,6 +33,7 @@ interface SessionFormProps {
 export default function SessionForm({
   mode,
   sessionId,
+  returnUrl = "/sessions",
   defaultValues,
 }: SessionFormProps) {
   const router = useRouter();
@@ -45,11 +47,32 @@ export default function SessionForm({
   const [notes, setNotes] = useState(defaultValues?.notes ?? "");
   const [myBuyIn, setMyBuyIn] = useState(defaultValues?.buyIn ?? 0);
   const [myCashOut, setMyCashOut] = useState(defaultValues?.cashOut ?? 0);
+  const [rawBuyIn, setRawBuyIn] = useState(String(defaultValues?.buyIn ?? 0));
+  const [rawCashOut, setRawCashOut] = useState(String(defaultValues?.cashOut ?? 0));
   const [players, setPlayers] = useState<PlayerRow[]>(
     defaultValues?.players ?? []
   );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Players that may have become orphaned (0 sessions) and should be deleted:
+  // - players removed from the form during editing
+  // - newly created players (orphaned if session is cancelled without saving)
+  // The DELETE API rejects deletion if a player still has sessions, so it is safe
+  // to call for any candidate regardless of whether they were recently created.
+  const playersToCheckRef = useRef(new Set<number>());
+
+  useEffect(() => {
+    return () => cleanupOrphans();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function cleanupOrphans() {
+    playersToCheckRef.current.forEach((id) => {
+      fetch(`/api/players/${id}`, { method: "DELETE" }).catch(() => {});
+    });
+    playersToCheckRef.current.clear();
+  }
 
   const myProfit = myCashOut - myBuyIn;
 
@@ -74,6 +97,7 @@ export default function SessionForm({
   }
 
   function removePlayer(index: number) {
+    playersToCheckRef.current.add(players[index].playerId);
     setPlayers((prev) => prev.filter((_, i) => i !== index));
   }
 
@@ -113,7 +137,10 @@ export default function SessionForm({
         return;
       }
 
-      router.push("/sessions");
+      // Clean up after a successful save: any removed player (or newly created
+      // player that ended up not in this session) with 0 sessions gets deleted.
+      cleanupOrphans();
+      router.push(returnUrl);
       router.refresh();
     } finally {
       setLoading(false);
@@ -121,7 +148,11 @@ export default function SessionForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form
+      onSubmit={handleSubmit}
+      onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+      className="space-y-6"
+    >
       {/* Date & Location */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input
@@ -161,12 +192,21 @@ export default function SessionForm({
                 £
               </span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 required
-                value={myBuyIn}
-                onChange={(e) => setMyBuyIn(Number(e.target.value))}
+                value={rawBuyIn}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (/^\d*\.?\d*$/.test(v)) setRawBuyIn(v);
+                }}
+                onFocus={(e) => e.target.select()}
+                onBlur={() => {
+                  const num = parseFloat(rawBuyIn);
+                  const final = isNaN(num) ? 0 : num;
+                  setRawBuyIn(String(final));
+                  setMyBuyIn(final);
+                }}
                 className="w-full rounded-md border border-zinc-700 bg-zinc-800 py-2 pl-7 pr-3 text-right text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
             </div>
@@ -180,12 +220,21 @@ export default function SessionForm({
                 £
               </span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 required
-                value={myCashOut}
-                onChange={(e) => setMyCashOut(Number(e.target.value))}
+                value={rawCashOut}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (/^\d*\.?\d*$/.test(v)) setRawCashOut(v);
+                }}
+                onFocus={(e) => e.target.select()}
+                onBlur={() => {
+                  const num = parseFloat(rawCashOut);
+                  const final = isNaN(num) ? 0 : num;
+                  setRawCashOut(String(final));
+                  setMyCashOut(final);
+                }}
                 className="w-full rounded-md border border-zinc-700 bg-zinc-800 py-2 pl-7 pr-3 text-right text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
             </div>
@@ -236,6 +285,7 @@ export default function SessionForm({
 
         <PlayerSearchCombobox
           onSelect={addPlayer}
+          onPlayerCreated={(id) => playersToCheckRef.current.add(id)}
           excludeIds={players.map((p) => p.playerId)}
           placeholder="Search players or add new..."
         />
@@ -247,7 +297,7 @@ export default function SessionForm({
         <Button
           type="button"
           variant="ghost"
-          onClick={() => router.push("/sessions")}
+          onClick={() => router.push(returnUrl)}
         >
           Cancel
         </Button>

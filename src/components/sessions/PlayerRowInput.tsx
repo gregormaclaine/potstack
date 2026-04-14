@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import Badge from "@/components/ui/Badge";
 
 interface PlayerRowInputProps {
@@ -8,6 +9,49 @@ interface PlayerRowInputProps {
   onChangeBuyIn: (index: number, value: number | null) => void;
   onChangeCashOut: (index: number, value: number | null) => void;
   onRemove: (index: number) => void;
+}
+
+// Controlled currency input: allows free typing, selects all on focus,
+// no spinner buttons, defaults empty to 0 on blur.
+function CurrencyInput({
+  value,
+  onChange,
+}: {
+  value: number | null;
+  onChange: (v: number) => void;
+}) {
+  const [raw, setRaw] = useState(value === null ? "" : String(value));
+
+  // If the parent resets value to null (tracking disabled), clear raw
+  useEffect(() => {
+    if (value === null) setRaw("");
+  }, [value]);
+
+  return (
+    <div className="relative">
+      <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
+        £
+      </span>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={raw}
+        onChange={(e) => {
+          const v = e.target.value;
+          // Allow digits, one optional dot, and empty string
+          if (/^\d*\.?\d*$/.test(v)) setRaw(v);
+        }}
+        onFocus={(e) => e.target.select()}
+        onBlur={() => {
+          const num = parseFloat(raw);
+          const final = isNaN(num) ? 0 : num;
+          setRaw(String(final));
+          onChange(final);
+        }}
+        className="w-24 rounded border border-zinc-700 bg-zinc-800 py-1.5 pl-5 pr-2 text-right text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+      />
+    </div>
+  );
 }
 
 export default function PlayerRowInput({
@@ -42,36 +86,18 @@ export default function PlayerRowInput({
         <>
           <div className="flex items-center gap-1">
             <span className="text-xs text-zinc-500">Buy-in</span>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
-                £
-              </span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={buyIn ?? 0}
-                onChange={(e) => onChangeBuyIn(index, Number(e.target.value))}
-                className="w-24 rounded border border-zinc-700 bg-zinc-800 py-1.5 pl-5 pr-2 text-right text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
+            <CurrencyInput
+              value={buyIn}
+              onChange={(v) => onChangeBuyIn(index, v)}
+            />
           </div>
 
           <div className="flex items-center gap-1">
             <span className="text-xs text-zinc-500">Cash-out</span>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
-                £
-              </span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={cashOut ?? 0}
-                onChange={(e) => onChangeCashOut(index, Number(e.target.value))}
-                className="w-24 rounded border border-zinc-700 bg-zinc-800 py-1.5 pl-5 pr-2 text-right text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
+            <CurrencyInput
+              value={cashOut}
+              onChange={(v) => onChangeCashOut(index, v)}
+            />
           </div>
 
           {profit !== null && <Badge value={profit} />}

@@ -4,7 +4,6 @@ import {
   useState,
   useEffect,
   useRef,
-  useCallback,
   KeyboardEvent,
 } from "react";
 import { clsx } from "clsx";
@@ -17,66 +16,51 @@ interface Player {
 
 interface PlayerSearchComboboxProps {
   onSelect: (player: Player) => void;
+  onPlayerCreated?: (id: number) => void;
   excludeIds?: number[];
   placeholder?: string;
 }
 
 export default function PlayerSearchCombobox({
   onSelect,
+  onPlayerCreated,
   excludeIds = [],
   placeholder = "Search or add player...",
 }: PlayerSearchComboboxProps) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Player[]>([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [preloaded, setPreloaded] = useState<Player[]>([]);
+  const [preloading, setPreloading] = useState(true);
+  const [focused, setFocused] = useState(false);
   const [creating, setCreating] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
 
-  const search = useCallback(
-    async (q: string) => {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `/api/players?search=${encodeURIComponent(q)}&limit=20`
-        );
-        const data = await res.json();
-        setResults(
-          (data.players as Player[]).filter((p) => !excludeIds.includes(p.id))
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [excludeIds]
-  );
-
+  // Fetch top 100 players by session count once on mount
   useEffect(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    if (!query.trim()) {
-      setResults([]);
-      setOpen(false);
-      return;
-    }
-    timeoutRef.current = setTimeout(() => {
-      search(query);
-      setOpen(true);
-    }, 300);
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [query, search]);
+    fetch("/api/players?limit=100")
+      .then((r) => r.json())
+      .then((data) => setPreloaded(data.players as Player[]))
+      .finally(() => setPreloading(false));
+  }, []);
 
-  const exactMatch = results.some(
-    (r) => r.name.toLowerCase() === query.trim().toLowerCase()
+  const trimmed = query.trim();
+
+  // Client-side filter: case-insensitive includes, already sorted by session count
+  const matched = preloaded.filter(
+    (p) =>
+      !excludeIds.includes(p.id) &&
+      (!trimmed || p.name.toLowerCase().includes(trimmed.toLowerCase()))
   );
-  const showAddOption = query.trim().length > 0 && !exactMatch;
-  const allOptions = showAddOption
-    ? [...results, { id: -1, name: `Add "${query.trim()}"` }]
-    : results;
+
+  const exactMatch = matched.some(
+    (r) => r.name.toLowerCase() === trimmed.toLowerCase()
+  );
+  const showAddOption = trimmed.length > 0 && !exactMatch;
+  const allOptions: Player[] = showAddOption
+    ? [...matched, { id: -1, name: trimmed }]
+    : matched;
+
+  const open = focused && allOptions.length > 0;
 
   async function handleAddNew() {
     setCreating(true);
@@ -84,42 +68,68 @@ export default function PlayerSearchCombobox({
       const res = await fetch("/api/players", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: query.trim() }),
+        body: JSON.stringify({ name: trimmed }),
       });
       if (res.ok) {
         const data = await res.json();
-        onSelect(data.player);
+        const newPlayer: Player = data.player;
+        setPreloaded((prev) => [newPlayer, ...prev]);
+        onPlayerCreated?.(newPlayer.id);
+        onSelect(newPlayer);
         setQuery("");
-        setOpen(false);
+        setFocused(false);
       }
     } finally {
       setCreating(false);
     }
   }
 
-  function handleSelect(player: Player) {
-    if (player.id === -1) {
+  function handleSelect(option: Player) {
+    if (option.id === -1) {
       handleAddNew();
     } else {
-      onSelect(player);
+      onSelect(option);
       setQuery("");
-      setOpen(false);
+      setFocused(false);
     }
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (!open || allOptions.length === 0) return;
+    if (e.key === "Tab") {
+      // Pick the top existing match; do nothing if there are none
+      if (matched.length > 0) {
+        e.preventDefault();
+        // Don't setFocused(false) — focus stays on the input, so keep the
+        // dropdown open and ready for the next player immediately.
+        onSelect(matched[0]);
+        setQuery("");
+        setActiveIndex(-1);
+      }
+      return;
+    }
+
+    if (e.key === "Enter") {
+      // Always block Enter from bubbling to the form
+      e.preventDefault();
+      if (open && activeIndex >= 0) {
+        handleSelect(allOptions[activeIndex]);
+      } else if (trimmed.length > 0 && matched.length === 0) {
+        // No existing players match — trigger Add
+        handleAddNew();
+      }
+      return;
+    }
+
+    if (!open) return;
+
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setActiveIndex((i) => Math.min(i + 1, allOptions.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActiveIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && activeIndex >= 0) {
-      e.preventDefault();
-      handleSelect(allOptions[activeIndex]);
     } else if (e.key === "Escape") {
-      setOpen(false);
+      setFocused(false);
       setActiveIndex(-1);
     }
   }
@@ -135,21 +145,18 @@ export default function PlayerSearchCombobox({
             setQuery(e.target.value);
             setActiveIndex(-1);
           }}
-          onFocus={() => query.trim() && setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 150)}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={preloading ? "Loading players…" : placeholder}
           disabled={creating}
           className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50"
         />
-        {(loading || creating) && <LoadingSpinner size="sm" />}
+        {creating && <LoadingSpinner size="sm" />}
       </div>
 
-      {open && allOptions.length > 0 && (
-        <ul
-          ref={listRef}
-          className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-zinc-700 bg-zinc-900 shadow-lg"
-        >
+      {open && (
+        <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-zinc-700 bg-zinc-900 shadow-lg">
           {allOptions.map((option, i) => (
             <li key={option.id}>
               <button
@@ -166,8 +173,7 @@ export default function PlayerSearchCombobox({
               >
                 {option.id === -1 ? (
                   <span className="flex items-center gap-1">
-                    <span className="text-emerald-400">+</span>{" "}
-                    Add &ldquo;{query.trim()}&rdquo;
+                    <span className="text-emerald-400">+</span> Add &ldquo;{trimmed}&rdquo;
                   </span>
                 ) : (
                   option.name

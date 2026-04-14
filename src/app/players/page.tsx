@@ -7,19 +7,29 @@ export const dynamic = "force-dynamic";
 
 export default async function PlayersPage() {
   const raw = await prisma.player.findMany({
-    orderBy: { name: "asc" },
     include: {
-      sessions: { select: { profit: true } },
+      sessions: {
+        select: {
+          profit: true,
+          session: { select: { profit: true } },
+        },
+      },
     },
   });
 
-  const players: PlayerWithStats[] = raw.map((p) => ({
-    id: p.id,
-    name: p.name,
-    createdAt: p.createdAt.toISOString(),
-    sessionCount: p.sessions.length,
-    totalProfit: p.sessions.reduce((sum, s) => sum + (s.profit ?? 0), 0),
-  }));
+  const players: PlayerWithStats[] = raw
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      createdAt: p.createdAt.toISOString(),
+      sessionCount: p.sessions.length,
+      totalProfit: p.sessions.reduce((sum, s) => sum + (s.profit ?? 0), 0),
+      avgSessionProfit:
+        p.sessions.length > 0
+          ? p.sessions.reduce((sum, s) => sum + s.session.profit, 0) / p.sessions.length
+          : 0,
+    }))
+    .sort((a, b) => b.sessionCount - a.sessionCount);
 
   return (
     <PageWrapper>

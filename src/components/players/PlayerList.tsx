@@ -108,6 +108,9 @@ export default function PlayerList({ initialPlayers }: PlayerListProps) {
                 Total Profit
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Avg Profit With
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Added
               </th>
               <th className="px-4 py-3" />
@@ -156,6 +159,9 @@ export default function PlayerList({ initialPlayers }: PlayerListProps) {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Badge value={player.totalProfit} />
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <Badge value={player.avgSessionProfit} />
                 </td>
                 <td className="px-4 py-3 text-right text-sm text-zinc-500">
                   {formatDate(player.createdAt)}
