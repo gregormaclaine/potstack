@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { cacheLife, cacheTag } from "next/cache";
 import { buildDashboardStats, filterSessionsByTimeline, filterSessionsByEvent } from "@/lib/stats";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import PageWrapper from "@/components/layout/PageWrapper";
@@ -13,11 +15,26 @@ import TimelineSelector from "@/components/dashboard/TimelineSelector";
 import EventSelector from "@/components/dashboard/EventSelector";
 import Button from "@/components/ui/Button";
 import { getDashboardData } from "@/lib/cache/dashboard";
+import DashboardLoading from "./loading";
 import type { SessionWithPlayers, PokerEvent } from "@/types";
 import type { EventModel } from "@/generated/prisma/models/Event";
 import type { Timeline } from "@/components/dashboard/TimelineSelector";
 
-export default async function DashboardPage({
+export const unstable_instant = { prefetch: "static", unstable_disableValidation: true };
+
+export default function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardAuthBridge searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function DashboardAuthBridge({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -35,6 +52,22 @@ export default async function DashboardPage({
       : "all";
 
   const eventId = eventParam ? Number(eventParam) : null;
+
+  return <DashboardView userId={userId} timeline={timeline} eventId={eventId} />;
+}
+
+async function DashboardView({
+  userId,
+  timeline,
+  eventId,
+}: {
+  userId: number;
+  timeline: Timeline;
+  eventId: number | null;
+}) {
+  "use cache";
+  cacheTag(`sessions:${userId}`, `events:${userId}`);
+  cacheLife("hours");
 
   const [raw, rawEvents] = await getDashboardData(userId);
 

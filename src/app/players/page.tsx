@@ -1,12 +1,32 @@
+import { Suspense } from "react";
 import { auth } from "@/auth";
+import { cacheLife, cacheTag } from "next/cache";
 import PageWrapper from "@/components/layout/PageWrapper";
 import PlayerList from "@/components/players/PlayerList";
 import { getPlayersPageData } from "@/lib/cache/players";
+import PlayersLoading from "./loading";
 import type { PlayerWithStats, PlayerGroup, PlayerLinkSummary, LinkStatus } from "@/types";
 
-export default async function PlayersPage() {
+export const unstable_instant = { prefetch: "static", unstable_disableValidation: true };
+
+export default function PlayersPage() {
+  return (
+    <Suspense fallback={<PlayersLoading />}>
+      <PlayersAuthBridge />
+    </Suspense>
+  );
+}
+
+async function PlayersAuthBridge() {
   const session = await auth();
   const userId = Number(session!.user!.id);
+  return <PlayersView userId={userId} />;
+}
+
+async function PlayersView({ userId }: { userId: number }) {
+  "use cache";
+  cacheTag(`players:${userId}`, `groups:${userId}`, `links:${userId}`);
+  cacheLife("hours");
 
   const [rawPlayers, rawGroups, rawSentLinks, rawReceivedLinks] = await getPlayersPageData(userId);
 
@@ -32,7 +52,6 @@ export default async function PlayersPage() {
   for (const l of rawSentLinks) {
     initialLinks.set(l.ownerPlayerId, { id: l.id, status: l.status as LinkStatus, linkedUsername: l.linkedUser.username, playerId: l.ownerPlayerId });
   }
-  // Received accepted links: only add if not already covered by a sent link for the same player
   for (const l of rawReceivedLinks) {
     if (l.linkedPlayerId !== null && !initialLinks.has(l.linkedPlayerId)) {
       initialLinks.set(l.linkedPlayerId, { id: l.id, status: "ACCEPTED", linkedUsername: l.ownerUser.username, playerId: l.linkedPlayerId });

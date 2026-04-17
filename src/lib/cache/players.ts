@@ -5,6 +5,7 @@ export async function getPlayersPageData(userId: number) {
   "use cache";
   cacheLife("hours");
   cacheTag(`players:${userId}`, `groups:${userId}`, `links:${userId}`);
+  console.log(`[cache-probe] getPlayersPageData called for userId=${userId} at ${Date.now()}`);
 
   return Promise.all([
     prisma.player.findMany({

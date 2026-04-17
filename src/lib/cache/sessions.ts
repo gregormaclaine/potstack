@@ -7,6 +7,7 @@ export async function getSessionsPageData(userId: number, page: number) {
   "use cache";
   cacheLife("hours");
   cacheTag(`sessions:${userId}`, `events:${userId}`, `invites:${userId}`);
+  console.log(`[cache-probe] getSessionsPageData called for userId=${userId} at ${Date.now()}`);
 
   return Promise.all([
     prisma.session.count({ where: { userId } }),

@@ -5,6 +5,7 @@ export async function getDashboardData(userId: number) {
   "use cache";
   cacheLife("hours");
   cacheTag(`sessions:${userId}`, `events:${userId}`);
+  console.log(`[cache-probe] getDashboardData called for userId=${userId} at ${Date.now()}`);
 
   return Promise.all([
     prisma.session.findMany({
