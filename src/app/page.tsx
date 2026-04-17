@@ -273,13 +273,13 @@ export default async function RootPage() {
       <section className="pt-32 pb-16 px-4 text-center">
         <div className="mx-auto max-w-2xl">
           <h1 className="text-5xl font-extrabold tracking-tight text-zinc-50">
-            Know your edge at{" "}
-            <span className="text-emerald-400">the table</span>
+            The tracker built for{" "}
+            <span className="text-emerald-400">your home game</span>
           </h1>
           <p className="mt-5 text-lg text-zinc-400 leading-relaxed">
-            PotStack logs every session, crunches your stats, and shows you
-            exactly where you're winning and where you're leaking chips. Stop
-            guessing. Start improving.
+            Track sessions, see who's up on the group, and settle the
+            long-running debate about who's actually the best player at the
+            table.
           </p>
           <div className="mt-8 flex justify-center">
             <Link
