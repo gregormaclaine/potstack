@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { captureEvent } from "@/lib/posthog";
 import { computeAndSaveBreakdownStats } from "@/lib/computeBreakdownStats";
 import { serializeSession, playerInclude, generateSessionInvites } from "@/lib/sessionUtils";
+import { revalidateTag } from "next/cache";
 import type { CreateSessionBody } from "@/types";
 
 export async function GET(request: NextRequest) {
@@ -104,6 +105,7 @@ export async function POST(request: NextRequest) {
   });
 
   await computeAndSaveBreakdownStats(userId);
+  revalidateTag(`sessions:${userId}`, "max");
 
   return NextResponse.json({ session: serializeSession(dbSession) }, { status: 201 });
 }

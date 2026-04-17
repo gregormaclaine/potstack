@@ -4,8 +4,6 @@ import { auth } from "@/auth";
 import { buildDashboardStats } from "@/lib/stats";
 import type { SessionWithPlayers } from "@/types";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {

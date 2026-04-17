@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { captureEvent } from "@/lib/posthog";
+import { revalidateTag } from "next/cache";
 
 export async function GET() {
   const session = await auth();
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
     group_id: group.id,
     color,
   });
+  revalidateTag(`groups:${userId}`, "max");
 
   return NextResponse.json({ group }, { status: 201 });
 }

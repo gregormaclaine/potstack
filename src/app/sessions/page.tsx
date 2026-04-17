@@ -1,13 +1,11 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import PageWrapper from "@/components/layout/PageWrapper";
 import SessionsView from "@/components/sessions/SessionsView";
 import { serializeSession } from "@/lib/sessionUtils";
+import { getSessionsPageData, SESSIONS_PAGE_LIMIT } from "@/lib/cache/sessions";
 import type { SessionWithPlayers, PokerEvent } from "@/types";
 import type { EventModel } from "@/generated/prisma/models/Event";
-
-export const dynamic = "force-dynamic";
 
 interface PageProps {
   searchParams: Promise<{ page?: string }>;
@@ -19,28 +17,9 @@ export default async function SessionsPage({ searchParams }: PageProps) {
 
   const { page: pageParam } = await searchParams;
   const page = Math.max(1, Number(pageParam ?? "1"));
-  const limit = 20;
 
-  const [total, raw, rawEvents, pendingInviteCount] = await Promise.all([
-    prisma.session.count({ where: { userId } }),
-    prisma.session.findMany({
-      where: { userId },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        players: {
-          include: { player: { select: { name: true, group: { select: { id: true, name: true, color: true } } } } },
-          orderBy: { player: { name: "asc" } },
-        },
-      },
-    }),
-    prisma.event.findMany({
-      where: { userId },
-      orderBy: { startDate: "desc" },
-    }),
-    prisma.sessionInvite.count({ where: { inviteeId: userId, status: "PENDING" } }),
-  ]);
+  const [total, raw, rawEvents, pendingInviteCount] = await getSessionsPageData(userId, page);
+  const limit = SESSIONS_PAGE_LIMIT;
 
   const sessions: SessionWithPlayers[] = raw.map(serializeSession);
 

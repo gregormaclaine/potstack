@@ -5,6 +5,7 @@ import {
   createNotification,
   deleteLinkRequestReceivedNotification,
 } from "@/lib/createNotification";
+import { revalidateTag } from "next/cache";
 
 export async function GET(
   _request: NextRequest,
@@ -93,6 +94,9 @@ export async function PATCH(
       }),
     ]);
 
+    revalidateTag(`links:${userId}`, "max");
+    revalidateTag(`links:${link.ownerUserId}`, "max");
+
     return NextResponse.json({ link: updated });
   }
 
@@ -158,6 +162,9 @@ export async function PATCH(
     }),
   ]);
 
+  revalidateTag(`links:${userId}`, "max");
+  revalidateTag(`links:${link.ownerUserId}`, "max");
+
   return NextResponse.json({ link: updated });
 }
 
@@ -197,6 +204,8 @@ export async function DELETE(
   }
 
   await prisma.playerLink.delete({ where: { id: Number(id) } });
+  revalidateTag(`links:${link.ownerUserId}`, "max");
+  revalidateTag(`links:${link.linkedUserId}`, "max");
 
   // Only fire link_broken notifications for previously-accepted links.
   if (link.status === "ACCEPTED" && link.linkedPlayer) {

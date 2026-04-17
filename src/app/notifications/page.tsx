@@ -4,8 +4,6 @@ import PageWrapper from "@/components/layout/PageWrapper";
 import NotificationsFeed from "@/components/invites/NotificationsFeed";
 import type { NotificationRow, NotificationData, NotificationType } from "@/types";
 
-export const dynamic = "force-dynamic";
-
 export default async function InvitesPage() {
   const session = await auth();
   const userId = Number(session!.user!.id);

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { captureEvent } from "@/lib/posthog";
 import { computeAndSaveBreakdownStats } from "@/lib/computeBreakdownStats";
 import { serializeSession, playerInclude, generateSessionInvites } from "@/lib/sessionUtils";
+import { revalidateTag } from "next/cache";
 import type { CreateSessionBody } from "@/types";
 
 export async function GET(
@@ -107,6 +108,7 @@ export async function PUT(
   });
 
   await computeAndSaveBreakdownStats(userId);
+  revalidateTag(`sessions:${userId}`, "max");
 
   return NextResponse.json({ session: serializeSession(session) });
 }
@@ -137,6 +139,7 @@ export async function DELETE(
   });
 
   await computeAndSaveBreakdownStats(userId);
+  revalidateTag(`sessions:${userId}`, "max");
 
   return NextResponse.json({ success: true });
 }

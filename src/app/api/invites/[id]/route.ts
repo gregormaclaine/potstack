@@ -6,6 +6,7 @@ import {
   createNotification,
   deleteSessionInviteReceivedNotification,
 } from "@/lib/createNotification";
+import { revalidateTag } from "next/cache";
 import type { PlayerMapping } from "@/types";
 
 export async function GET(
@@ -134,6 +135,8 @@ export async function PATCH(
         data: { type: "session_invite_rejected", otherUsername: inviteeUsername, sessionDate, sessionLocation },
       }),
     ]);
+
+    revalidateTag(`invites:${userId}`, "max");
 
     return NextResponse.json({ success: true });
   }
@@ -288,6 +291,9 @@ export async function PATCH(
       data: { type: "session_invite_accepted", otherUsername: inviteeUsername, sessionDate, sessionLocation },
     }),
   ]);
+
+  revalidateTag(`sessions:${userId}`, "max");
+  revalidateTag(`invites:${userId}`, "max");
 
   return NextResponse.json({ sessionId: newSession.id });
 }

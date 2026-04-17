@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { captureEvent } from "@/lib/posthog";
+import { revalidateTag } from "next/cache";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
   const player = await prisma.player.create({ data: { name, userId } });
 
   captureEvent(session.user.name ?? `userId[${userId}]`, "player created", { player_id: player.id });
+  revalidateTag(`players:${userId}`, "max");
 
   return NextResponse.json({ player }, { status: 201 });
 }

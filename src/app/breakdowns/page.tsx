@@ -7,8 +7,6 @@ import type { SessionWithPlayers, PlayerGroup } from "@/types";
 
 type RawPlayer = { id: number; name: string; groupId: number | null; group: PlayerGroup | null };
 
-export const dynamic = "force-dynamic";
-
 export default async function BreakdownsPage() {
   const session = await auth();
   const userId = Number(session!.user!.id);

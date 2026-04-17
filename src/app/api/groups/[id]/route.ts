@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { captureEvent } from "@/lib/posthog";
+import { revalidateTag } from "next/cache";
 
 export async function PUT(
   request: NextRequest,
@@ -56,6 +57,7 @@ export async function PUT(
       color,
     });
   }
+  revalidateTag(`groups:${userId}`, "max");
 
   return NextResponse.json({ group });
 }
@@ -88,6 +90,7 @@ export async function DELETE(
   await prisma.playerGroup.delete({ where: { id: Number(id) } });
 
   captureEvent(session.user.name ?? `userId[${userId}]`, "group deleted", { group_id: Number(id) });
+  revalidateTag(`groups:${userId}`, "max");
 
   return NextResponse.json({ success: true });
 }

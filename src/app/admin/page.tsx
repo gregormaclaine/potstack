@@ -4,8 +4,6 @@ import { prisma } from "@/lib/prisma";
 import PageWrapper from "@/components/layout/PageWrapper";
 import StatCard from "@/components/dashboard/StatCard";
 
-export const dynamic = "force-dynamic";
-
 export default async function AdminPage() {
   const session = await auth();
   if (!session?.user?.isAdmin) notFound();

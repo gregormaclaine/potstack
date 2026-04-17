@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { revalidateTag } from "next/cache";
 import type { CreateEventBody, PokerEvent } from "@/types";
 
 function serializeEvent(e: {
@@ -59,6 +60,8 @@ export async function POST(req: Request) {
       userId,
     },
   });
+
+  revalidateTag(`events:${userId}`, "max");
 
   return NextResponse.json({ event: serializeEvent(event) }, { status: 201 });
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { captureEvent } from "@/lib/posthog";
+import { revalidateTag } from "next/cache";
 
 export async function GET(
   _request: NextRequest,
@@ -95,6 +96,8 @@ export async function PUT(
     }
   }
 
+  revalidateTag(`players:${userId}`, "max");
+
   return NextResponse.json({ player });
 }
 
@@ -131,6 +134,7 @@ export async function DELETE(
   await prisma.player.delete({ where: { id: Number(id) } });
 
   captureEvent(session.user.name ?? `userId[${userId}]`, "player deleted", { player_id: Number(id) });
+  revalidateTag(`players:${userId}`, "max");
 
   return NextResponse.json({ success: true });
 }

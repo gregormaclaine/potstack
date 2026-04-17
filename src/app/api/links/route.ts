@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { createNotification } from "@/lib/createNotification";
+import { revalidateTag } from "next/cache";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -115,6 +116,7 @@ export async function POST(request: NextRequest) {
       playerName: player.name,
     },
   });
+  revalidateTag(`links:${userId}`, "max");
 
   return NextResponse.json({ link }, { status: 201 });
 }

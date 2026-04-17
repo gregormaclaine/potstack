@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { revalidateTag } from "next/cache";
 import type { UpdateEventBody, PokerEvent } from "@/types";
 
 function serializeEvent(e: {
@@ -67,6 +68,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     },
   });
 
+  revalidateTag(`events:${userId}`, "max");
+
   return NextResponse.json({ event: serializeEvent(updated) });
 }
 
@@ -80,6 +83,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await prisma.event.delete({ where: { id: Number(id) } });
+  revalidateTag(`events:${userId}`, "max");
 
   return NextResponse.json({ success: true });
 }

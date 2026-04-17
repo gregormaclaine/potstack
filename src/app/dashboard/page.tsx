@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { buildDashboardStats, filterSessionsByTimeline, filterSessionsByEvent } from "@/lib/stats";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
@@ -13,11 +12,10 @@ import SessionBreakdownTable from "@/components/dashboard/SessionBreakdownTable"
 import TimelineSelector from "@/components/dashboard/TimelineSelector";
 import EventSelector from "@/components/dashboard/EventSelector";
 import Button from "@/components/ui/Button";
+import { getDashboardData } from "@/lib/cache/dashboard";
 import type { SessionWithPlayers, PokerEvent } from "@/types";
 import type { EventModel } from "@/generated/prisma/models/Event";
 import type { Timeline } from "@/components/dashboard/TimelineSelector";
-
-export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({
   searchParams,
@@ -38,22 +36,7 @@ export default async function DashboardPage({
 
   const eventId = eventParam ? Number(eventParam) : null;
 
-  const [raw, rawEvents] = await Promise.all([
-    prisma.session.findMany({
-      where: { userId },
-      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
-      include: {
-        players: {
-          include: { player: { select: { name: true } } },
-          orderBy: { player: { name: "asc" } },
-        },
-      },
-    }),
-    prisma.event.findMany({
-      where: { userId },
-      orderBy: { startDate: "desc" },
-    }),
-  ]);
+  const [raw, rawEvents] = await getDashboardData(userId);
 
   const allSessions: SessionWithPlayers[] = raw.map((s) => ({
     id: s.id,
