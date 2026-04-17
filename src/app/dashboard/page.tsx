@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { buildDashboardStats, filterSessionsByTimeline, filterSessionsByEvent } from "@/lib/stats";
+import {
+  buildDashboardStats,
+  filterSessionsByTimeline,
+  filterSessionsByEvent,
+} from "@/lib/stats";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import PageWrapper from "@/components/layout/PageWrapper";
 import StatCard from "@/components/dashboard/StatCard";
@@ -85,7 +89,9 @@ export default async function DashboardPage({
     updatedAt: e.updatedAt.toISOString(),
   }));
 
-  const activeEvent = eventId ? events.find((e) => e.id === eventId) ?? null : null;
+  const activeEvent = eventId
+    ? (events.find((e) => e.id === eventId) ?? null)
+    : null;
 
   const sessions = activeEvent
     ? filterSessionsByEvent(allSessions, activeEvent)
@@ -94,15 +100,16 @@ export default async function DashboardPage({
   const stats = buildDashboardStats(sessions);
 
   const profitTrend =
-    stats.totalProfit > 0
-      ? "up"
-      : stats.totalProfit < 0
-      ? "down"
-      : "neutral";
+    stats.totalProfit > 0 ? "up" : stats.totalProfit < 0 ? "down" : "neutral";
 
   const filterBar = (
     <div className="flex flex-wrap items-center gap-2">
-      <EventSelector events={events} currentEventId={activeEvent?.id ?? null} />
+      {activeEvent && (
+        <EventSelector
+          events={events}
+          currentEventId={activeEvent?.id ?? null}
+        />
+      )}
       {!activeEvent && <TimelineSelector current={timeline} />}
     </div>
   );
@@ -116,7 +123,9 @@ export default async function DashboardPage({
         </div>
         <div className="rounded-xl border border-dashed border-zinc-700 py-20 text-center">
           <p className="text-lg font-medium text-zinc-400">
-            {activeEvent ? `No sessions in "${activeEvent.name}"` : "No sessions recorded yet"}
+            {activeEvent
+              ? `No sessions in "${activeEvent.name}"`
+              : "No sessions recorded yet"}
           </p>
           <p className="mt-1 text-sm text-zinc-600">
             {activeEvent
