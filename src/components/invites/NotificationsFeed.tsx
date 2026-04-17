@@ -470,7 +470,7 @@ function NotificationText({ data, sessionId }: { data: NotificationData; session
       return <><span className="font-medium text-zinc-100">@{data.otherUsername}</span> rejected your session from <SessionLink sessionId={sessionId} date={data.sessionDate} /></>;
 
     case "session_invite_rejected_by_me":
-      return <>You rejected <span className="font-medium text-zinc-100">@{data.otherUsername}</span>&apos;s session from <SessionLink sessionId={sessionId} date={data.sessionDate} /></>;
+      return <>You rejected <span className="font-medium text-zinc-100">@{data.otherUsername}</span>&apos;s session from <SessionLink sessionId={null} date={data.sessionDate} /></>;
 
     default:
       return null;
