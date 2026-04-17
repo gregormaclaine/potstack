@@ -473,7 +473,7 @@ export default function PlayerList({ initialPlayers, initialGroups, initialLinks
                       editingId === player.id && "invisible"
                     )}
                   >
-                    <Button size="sm" variant="secondary" onClick={() => setLinkingPlayer(player)}>
+                    <Button size="sm" variant="ghost" onClick={() => setLinkingPlayer(player)}>
                       {links.has(player.id) ? (
                         <span className="flex items-center gap-1">
                           <span
@@ -486,13 +486,13 @@ export default function PlayerList({ initialPlayers, initialGroups, initialLinks
                                 : "bg-red-400"
                             )}
                           />
-                          Linked
+                          {links.get(player.id)!.status === "PENDING" ? "Linking" : "Linked"}
                         </span>
                       ) : (
                         "Link"
                       )}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => startEdit(player)}>
+                    <Button size="sm" variant="secondary" onClick={() => startEdit(player)}>
                       Edit
                     </Button>
                     <Button
