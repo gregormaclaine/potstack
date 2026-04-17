@@ -5,6 +5,7 @@ import Link from "next/link";
 import { clsx } from "clsx";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import Modal from "@/components/ui/Modal";
 import { formatDate, formatCurrency } from "@/lib/formatters";
 import type {
   NotificationRow,
@@ -553,6 +554,27 @@ function LinkRequestReceivedCard({
   );
 }
 
+// ── InviteSessionDetail type ──────────────────────────────────────────────────
+
+interface InviteSessionDetailPlayer {
+  name: string;
+  buyIn: number | null;
+  cashOut: number | null;
+  profit: number | null;
+  isYou: boolean;
+}
+
+interface InviteSessionDetail {
+  date: string;
+  location: string | null;
+  notes: string | null;
+  inviterUsername: string;
+  inviterBuyIn: number;
+  inviterCashOut: number;
+  inviterProfit: number;
+  players: InviteSessionDetailPlayer[];
+}
+
 // ── SessionInviteReceivedCard ─────────────────────────────────────────────────
 
 function SessionInviteReceivedCard({
@@ -586,6 +608,22 @@ function SessionInviteReceivedCard({
   onCancelMapping: () => void;
   onSubmitMapping: () => void;
 }) {
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewData, setViewData] = useState<InviteSessionDetail | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+
+  async function openView() {
+    setViewOpen(true);
+    if (viewData || !notif.inviteId) return;
+    setViewLoading(true);
+    try {
+      const res = await fetch(`/api/invites/${notif.inviteId}`);
+      if (res.ok) setViewData(await res.json());
+    } finally {
+      setViewLoading(false);
+    }
+  }
+
   return (
     <li className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 space-y-2">
       <div className="flex items-start justify-between gap-3">
@@ -597,7 +635,15 @@ function SessionInviteReceivedCard({
           </p>
           <p className="text-xs text-zinc-600">{timeAgo(createdAt)}</p>
         </div>
-        {!invitePending && <StatusPill status={notif.invite?.status ?? "PENDING"} />}
+        <div className="flex items-center gap-2 shrink-0">
+          {!invitePending && <StatusPill status={notif.invite?.status ?? "PENDING"} />}
+          <button
+            onClick={openView}
+            className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
+          >
+            View
+          </button>
+        </div>
       </div>
 
       {invitePending && invitePhase.phase === "idle" && (
@@ -635,6 +681,60 @@ function SessionInviteReceivedCard({
       )}
 
       {!invitePending && d.profit != null && <Badge value={d.profit} />}
+
+      <Modal
+        open={viewOpen}
+        onClose={() => setViewOpen(false)}
+        title="Session Details"
+      >
+        {viewLoading && <p className="text-sm text-zinc-500">Loading…</p>}
+        {!viewLoading && viewData && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-medium text-zinc-100">{formatDate(viewData.date)}</p>
+              {viewData.location && <p className="text-xs text-zinc-400">@ {viewData.location}</p>}
+              {viewData.notes && <p className="mt-1 text-xs text-zinc-500">{viewData.notes}</p>}
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-600">Your result</p>
+              <div className="flex items-center gap-4 text-sm">
+                {d.buyIn != null && <span className="text-zinc-400"><span className="mr-1 text-xs text-zinc-600">Buy-in</span>{formatCurrency(d.buyIn)}</span>}
+                {d.cashOut != null && <span className="text-zinc-400"><span className="mr-1 text-xs text-zinc-600">Cash-out</span>{formatCurrency(d.cashOut)}</span>}
+                {d.profit != null && <Badge value={d.profit} />}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-600">All players</p>
+              <ul className="space-y-1.5">
+                <li className="flex items-center justify-between text-sm">
+                  <span className="text-zinc-300">
+                    @{viewData.inviterUsername}
+                    <span className="ml-1.5 text-xs text-zinc-600">(host)</span>
+                  </span>
+                  <div className="flex items-center gap-3">
+                    {viewData.inviterBuyIn != null && <span className="text-xs text-zinc-500">{formatCurrency(viewData.inviterBuyIn)}</span>}
+                    <Badge value={viewData.inviterProfit} />
+                  </div>
+                </li>
+                {viewData.players.map((p, i) => (
+                  <li key={i} className="flex items-center justify-between text-sm">
+                    <span className={clsx("text-zinc-300", p.isYou && "font-medium text-zinc-100")}>
+                      {p.name}
+                      {p.isYou && <span className="ml-1.5 text-xs text-zinc-600">(you)</span>}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      {p.buyIn != null && <span className="text-xs text-zinc-500">{formatCurrency(p.buyIn)}</span>}
+                      {p.profit != null && <Badge value={p.profit} />}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+      </Modal>
     </li>
   );
 }

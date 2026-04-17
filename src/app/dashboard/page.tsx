@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { buildDashboardStats, filterSessionsByTimeline } from "@/lib/stats";
+import { buildDashboardStats, filterSessionsByTimeline, filterSessionsByEvent } from "@/lib/stats";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import PageWrapper from "@/components/layout/PageWrapper";
 import StatCard from "@/components/dashboard/StatCard";
@@ -11,8 +11,10 @@ import ProfitSpreadChart from "@/components/dashboard/ProfitSpreadChart";
 import TopPlayersChart from "@/components/dashboard/TopPlayersChart";
 import SessionBreakdownTable from "@/components/dashboard/SessionBreakdownTable";
 import TimelineSelector from "@/components/dashboard/TimelineSelector";
+import EventSelector from "@/components/dashboard/EventSelector";
 import Button from "@/components/ui/Button";
-import type { SessionWithPlayers } from "@/types";
+import type { SessionWithPlayers, PokerEvent } from "@/types";
+import type { EventModel } from "@/generated/prisma/models/Event";
 import type { Timeline } from "@/components/dashboard/TimelineSelector";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +27,8 @@ export default async function DashboardPage({
   const userSession = await auth();
   const userId = Number(userSession!.user!.id);
 
-  const { timeline: timelineParam } = await searchParams;
+  const { timeline: timelineParam, event: eventParam } = await searchParams;
+
   const timeline: Timeline =
     timelineParam === "ytd" ||
     timelineParam === "last-3-months" ||
@@ -33,16 +36,24 @@ export default async function DashboardPage({
       ? timelineParam
       : "all";
 
-  const raw = await prisma.session.findMany({
-    where: { userId },
-    orderBy: [{ date: "asc" }, { createdAt: "asc" }],
-    include: {
-      players: {
-        include: { player: { select: { name: true } } },
-        orderBy: { player: { name: "asc" } },
+  const eventId = eventParam ? Number(eventParam) : null;
+
+  const [raw, rawEvents] = await Promise.all([
+    prisma.session.findMany({
+      where: { userId },
+      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+      include: {
+        players: {
+          include: { player: { select: { name: true } } },
+          orderBy: { player: { name: "asc" } },
+        },
       },
-    },
-  });
+    }),
+    prisma.event.findMany({
+      where: { userId },
+      orderBy: { startDate: "desc" },
+    }),
+  ]);
 
   const allSessions: SessionWithPlayers[] = raw.map((s) => ({
     id: s.id,
@@ -64,7 +75,22 @@ export default async function DashboardPage({
     })),
   }));
 
-  const sessions = filterSessionsByTimeline(allSessions, timeline);
+  const events: PokerEvent[] = (rawEvents as EventModel[]).map((e) => ({
+    id: e.id,
+    name: e.name,
+    startDate: e.startDate.toISOString(),
+    endDate: e.endDate.toISOString(),
+    color: e.color,
+    createdAt: e.createdAt.toISOString(),
+    updatedAt: e.updatedAt.toISOString(),
+  }));
+
+  const activeEvent = eventId ? events.find((e) => e.id === eventId) ?? null : null;
+
+  const sessions = activeEvent
+    ? filterSessionsByEvent(allSessions, activeEvent)
+    : filterSessionsByTimeline(allSessions, timeline);
+
   const stats = buildDashboardStats(sessions);
 
   const profitTrend =
@@ -74,23 +100,34 @@ export default async function DashboardPage({
       ? "down"
       : "neutral";
 
+  const filterBar = (
+    <div className="flex flex-wrap items-center gap-2">
+      <EventSelector events={events} currentEventId={activeEvent?.id ?? null} />
+      {!activeEvent && <TimelineSelector current={timeline} />}
+    </div>
+  );
+
   if (sessions.length === 0) {
     return (
       <PageWrapper>
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold text-zinc-100">Dashboard</h1>
-          <TimelineSelector current={timeline} />
+          {filterBar}
         </div>
         <div className="rounded-xl border border-dashed border-zinc-700 py-20 text-center">
           <p className="text-lg font-medium text-zinc-400">
-            No sessions recorded yet
+            {activeEvent ? `No sessions in "${activeEvent.name}"` : "No sessions recorded yet"}
           </p>
           <p className="mt-1 text-sm text-zinc-600">
-            Start tracking your poker sessions to see your stats here.
+            {activeEvent
+              ? "No sessions fall within this event's date range."
+              : "Start tracking your poker sessions to see your stats here."}
           </p>
-          <Link href="/sessions/new">
-            <Button className="mt-6">Record First Session</Button>
-          </Link>
+          {!activeEvent && (
+            <Link href="/sessions/new">
+              <Button className="mt-6">Record First Session</Button>
+            </Link>
+          )}
         </div>
       </PageWrapper>
     );
@@ -101,7 +138,7 @@ export default async function DashboardPage({
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-zinc-100">Dashboard</h1>
         <div className="flex items-center gap-3">
-          <TimelineSelector current={timeline} />
+          {filterBar}
           <Link href="/sessions/new">
             <Button size="sm">New Session</Button>
           </Link>

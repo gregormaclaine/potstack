@@ -2,10 +2,10 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import PageWrapper from "@/components/layout/PageWrapper";
-import SessionTable from "@/components/sessions/SessionTable";
-import Button from "@/components/ui/Button";
+import SessionsView from "@/components/sessions/SessionsView";
 import { serializeSession } from "@/lib/sessionUtils";
-import type { SessionWithPlayers } from "@/types";
+import type { SessionWithPlayers, PokerEvent } from "@/types";
+import type { EventModel } from "@/generated/prisma/models/Event";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export default async function SessionsPage({ searchParams }: PageProps) {
   const page = Math.max(1, Number(pageParam ?? "1"));
   const limit = 20;
 
-  const [total, raw, pendingInviteCount] = await Promise.all([
+  const [total, raw, rawEvents, pendingInviteCount] = await Promise.all([
     prisma.session.count({ where: { userId } }),
     prisma.session.findMany({
       where: { userId },
@@ -35,10 +35,24 @@ export default async function SessionsPage({ searchParams }: PageProps) {
         },
       },
     }),
+    prisma.event.findMany({
+      where: { userId },
+      orderBy: { startDate: "desc" },
+    }),
     prisma.sessionInvite.count({ where: { inviteeId: userId, status: "PENDING" } }),
   ]);
 
   const sessions: SessionWithPlayers[] = raw.map(serializeSession);
+
+  const events: PokerEvent[] = (rawEvents as EventModel[]).map((e) => ({
+    id: e.id,
+    name: e.name,
+    startDate: e.startDate.toISOString(),
+    endDate: e.endDate.toISOString(),
+    color: e.color,
+    createdAt: e.createdAt.toISOString(),
+    updatedAt: e.updatedAt.toISOString(),
+  }));
 
   return (
     <PageWrapper>
@@ -50,14 +64,9 @@ export default async function SessionsPage({ searchParams }: PageProps) {
           <span className="text-emerald-500">View →</span>
         </Link>
       )}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-zinc-100">Sessions</h1>
-        <Link href="/sessions/new">
-          <Button>New Session</Button>
-        </Link>
-      </div>
-      <SessionTable
+      <SessionsView
         sessions={sessions}
+        initialEvents={events}
         total={total}
         page={page}
         totalPages={Math.ceil(total / limit)}

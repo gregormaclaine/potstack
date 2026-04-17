@@ -219,6 +219,30 @@ export interface NotificationRow {
   invite: { status: string } | null;
 }
 
+export interface PokerEvent {
+  id: number;
+  name: string;
+  startDate: string; // ISO
+  endDate: string; // ISO
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEventBody {
+  name: string;
+  startDate: string;
+  endDate: string;
+  color?: string;
+}
+
+export interface UpdateEventBody {
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  color?: string;
+}
+
 export interface CreateSessionBody {
   date: string;
   location?: string;

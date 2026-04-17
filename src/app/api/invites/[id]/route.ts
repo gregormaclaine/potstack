@@ -8,6 +8,74 @@ import {
 } from "@/lib/createNotification";
 import type { PlayerMapping } from "@/types";
 
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = Number(session.user.id);
+
+  const { id } = await params;
+
+  const invite = await prisma.sessionInvite.findUnique({
+    where: { id: Number(id) },
+    select: {
+      inviteeId: true,
+      sessionPlayerId: true,
+      session: {
+        select: {
+          date: true,
+          location: true,
+          notes: true,
+          buyIn: true,
+          cashOut: true,
+          profit: true,
+          user: { select: { username: true } },
+          players: {
+            select: {
+              id: true,
+              buyIn: true,
+              cashOut: true,
+              profit: true,
+              player: { select: { name: true } },
+            },
+            orderBy: { player: { name: "asc" } },
+          },
+        },
+      },
+    },
+  });
+
+  if (!invite) {
+    return NextResponse.json({ error: "Invite not found" }, { status: 404 });
+  }
+  if (invite.inviteeId !== userId) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { session: src } = invite;
+
+  return NextResponse.json({
+    date: src.date.toISOString(),
+    location: src.location,
+    notes: src.notes,
+    inviterUsername: src.user.username,
+    inviterBuyIn: src.buyIn,
+    inviterCashOut: src.cashOut,
+    inviterProfit: src.profit,
+    players: src.players.map((sp) => ({
+      name: sp.player.name,
+      buyIn: sp.buyIn,
+      cashOut: sp.cashOut,
+      profit: sp.profit,
+      isYou: sp.id === invite.sessionPlayerId,
+    })),
+  });
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

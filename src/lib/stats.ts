@@ -1,5 +1,19 @@
-import type { SessionWithPlayers, DashboardStats, TopPlayer } from "@/types";
+import type { SessionWithPlayers, DashboardStats, TopPlayer, PokerEvent } from "@/types";
 import type { Timeline } from "@/components/dashboard/TimelineSelector";
+
+export function filterSessionsByEvent(
+  sessions: SessionWithPlayers[],
+  event: PokerEvent
+): SessionWithPlayers[] {
+  const start = new Date(event.startDate);
+  const end = new Date(event.endDate);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return sessions.filter((s) => {
+    const d = new Date(s.date);
+    return d >= start && d <= end;
+  });
+}
 
 export function filterSessionsByTimeline(
   sessions: SessionWithPlayers[],
