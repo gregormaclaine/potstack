@@ -30,9 +30,10 @@ export default function ProfitLineChart({ data }: ProfitLineChartProps) {
     );
   }
 
-  const chartData = data.map((p) => ({
+  const chartData = data.map((p, i) => ({
     ...p,
-    timestamp: new Date(p.date).getTime(),
+    index: i,
+    timestamp: new Date(p.date).getTime() + i,
   }));
 
   return (
@@ -68,8 +69,8 @@ export default function ProfitLineChart({ data }: ProfitLineChartProps) {
             />
           ) : (
             <XAxis
-              dataKey="date"
-              tickFormatter={(v) => formatDate(v, "d MMM")}
+              dataKey="index"
+              tickFormatter={(v) => formatDate(chartData[v as number]?.date ?? "", "d MMM")}
               tick={{ fill: "#71717a", fontSize: 11 }}
               axisLine={{ stroke: "#27272a" }}
               tickLine={false}
@@ -92,7 +93,7 @@ export default function ProfitLineChart({ data }: ProfitLineChartProps) {
             labelFormatter={(v) =>
               dateScale
                 ? formatDate(new Date(v as number).toISOString())
-                : formatDate(v as string)
+                : formatDate(chartData[v as number]?.date ?? "")
             }
             formatter={(value) => [formatCurrency(Number(value)), "Cumulative"]}
           />
