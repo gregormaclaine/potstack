@@ -17,14 +17,21 @@ export const authConfig: NextAuthConfig = {
       if (isLoggedIn && (nextUrl.pathname === "/login" || nextUrl.pathname === "/register")) {
         return Response.redirect(new URL("/dashboard", nextUrl));
       }
+      if (nextUrl.pathname.startsWith("/admin") && !auth?.user?.isAdmin) {
+        return Response.redirect(new URL("/dashboard", nextUrl));
+      }
       return true;
     },
     jwt({ token, user }) {
-      if (user) token.id = user.id;
+      if (user) {
+        token.id = user.id;
+        token.isAdmin = user.isAdmin;
+      }
       return token;
     },
     session({ session, token }) {
       if (token.id) session.user.id = token.id as string;
+      session.user.isAdmin = token.isAdmin ?? false;
       return session;
     },
   },

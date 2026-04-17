@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -28,6 +28,10 @@ export default function Navbar() {
   function handleMenuLeave() {
     closeTimer.current = setTimeout(() => setMenuOpen(false), 150);
   }
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
 
   const isAuthPage =
     pathname === "/login" || pathname === "/register" || pathname === "/";
@@ -51,7 +55,7 @@ export default function Navbar() {
               <li key={href}>
                 <Link
                   href={href}
-                  className={clsx(
+                                    className={clsx(
                     "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                     active
                       ? "bg-zinc-800 text-zinc-100"
@@ -63,6 +67,24 @@ export default function Navbar() {
               </li>
             );
           })}
+          {session?.user?.isAdmin && (
+            <li>
+              <Link
+                href="/admin"
+                                className={clsx(
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  pathname === "/admin"
+                    ? "bg-zinc-800 text-zinc-100"
+                    : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
+                )}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Admin
+              </Link>
+            </li>
+          )}
         </ul>
 
         {/* Desktop user menu — hover dropdown */}
@@ -145,6 +167,25 @@ export default function Navbar() {
                 </li>
               );
             })}
+            {session?.user?.isAdmin && (
+              <li>
+                <Link
+                  href="/admin"
+                  onClick={() => setOpen(false)}
+                  className={clsx(
+                    "flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    pathname === "/admin"
+                      ? "bg-zinc-800 text-zinc-100"
+                      : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
+                  )}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  Admin
+                </Link>
+              </li>
+            )}
           </ul>
 
           {/* Mobile user section — always visible in hamburger */}

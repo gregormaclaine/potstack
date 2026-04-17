@@ -20,10 +20,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!user) return null;
         const valid = await bcrypt.compare(
           String(credentials.password),
-          user.passwordHash
+          user.passwordHash,
         );
         if (!valid) return null;
-        return { id: String(user.id), name: user.username };
+        return {
+          id: String(user.id),
+          name: user.username,
+          isAdmin: user.isAdmin,
+        };
       },
     }),
   ],
