@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
 import { auth } from "@/auth";
+import CurrentYear from "@/components/ui/CurrentYear";
 import StatCard from "@/components/dashboard/StatCard";
 import ProfitLineChart from "@/components/dashboard/ProfitLineChart";
 import WinLossBarChart from "@/components/dashboard/WinLossBarChart";
@@ -366,7 +367,7 @@ export default function RootPage() {
 
 {/* ── Footer ── */}
       <footer className="border-t border-zinc-800/60 px-4 py-6 text-center text-xs text-zinc-600">
-        © {new Date().getFullYear()} PotStack
+        © <CurrentYear /> PotStack
       </footer>
     </div>
   );
