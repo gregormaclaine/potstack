@@ -21,7 +21,7 @@ export default function InviteBadge() {
     fetchCount();
   }, [pathname]);
 
-  if (count === 0) return null;
+  if (count === 0 || pathname === "/notifications") return null;
 
   return (
     <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">

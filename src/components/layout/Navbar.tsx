@@ -83,10 +83,10 @@ export default function Navbar() {
                     <p className="text-sm font-bold text-zinc-200">@{session.user.name}</p>
                   </div>
                   <Link
-                    href="/invites"
+                    href="/notifications"
                     className={clsx(
                       "flex items-center gap-1.5 px-4 py-2 text-sm transition-colors hover:bg-zinc-800",
-                      pathname === "/invites" ? "text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
+                      pathname === "/notifications" ? "text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
                     )}
                   >
                     Notifications
@@ -154,11 +154,11 @@ export default function Navbar() {
                 @{session.user.name}
               </p>
               <Link
-                href="/invites"
+                href="/notifications"
                 onClick={() => setOpen(false)}
                 className={clsx(
                   "flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  pathname === "/invites"
+                  pathname === "/notifications"
                     ? "bg-zinc-800 text-zinc-100"
                     : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
                 )}

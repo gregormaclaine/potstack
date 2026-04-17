@@ -201,6 +201,7 @@ export default function LinkPlayerModal({
               onChange={(e) => setUsername(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && searchResult) sendRequest(); }}
               autoFocus
+              autoComplete="off"
             />
             {searching && <p className="text-xs text-zinc-500">Searching…</p>}
             {searchResult && !searching && (

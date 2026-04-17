@@ -43,7 +43,7 @@ export default async function SessionsPage({ searchParams }: PageProps) {
   return (
     <PageWrapper>
       {pendingInviteCount > 0 && (
-        <Link href="/invites" className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-emerald-700/50 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-300 transition-colors hover:bg-emerald-950/60">
+        <Link href="/notifications" className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-emerald-700/50 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-300 transition-colors hover:bg-emerald-950/60">
           <span>
             <span className="font-semibold">{pendingInviteCount} session {pendingInviteCount === 1 ? "invite" : "invites"}</span> waiting for your approval
           </span>
