@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         id: l.id,
         status: l.status,
         playerId: l.ownerPlayerId,
-        targetUsername: l.linkedUser.username,
+        linkedUsername: l.linkedUser.username,
       })),
     });
   }

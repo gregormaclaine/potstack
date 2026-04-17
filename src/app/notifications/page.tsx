@@ -24,13 +24,11 @@ export default async function InvitesPage() {
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    prisma.notification.updateMany({
+      where: { userId, read: false },
+      data: { read: true },
+    }),
   ]);
-
-  // Mark all unread notifications as read (fire-and-forget — don't block the render)
-  void prisma.notification.updateMany({
-    where: { userId, read: false },
-    data: { read: true },
-  });
 
   const notifications: NotificationRow[] = rawNotifications.map((n) => ({
     id: n.id,
