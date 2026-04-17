@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
+import { Suspense } from "react";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import PostHogProvider from "@/components/PostHogProvider";
@@ -33,7 +34,9 @@ export default function RootLayout({
       <body className="min-h-full bg-zinc-950 text-zinc-100">
         <SessionProvider>
           <PostHogProvider>
-            <Navbar />
+            <Suspense>
+              <Navbar />
+            </Suspense>
             {children}
           </PostHogProvider>
         </SessionProvider>
