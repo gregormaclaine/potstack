@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { auth } from "@/auth";
 import StatCard from "@/components/dashboard/StatCard";
 import ProfitLineChart from "@/components/dashboard/ProfitLineChart";
@@ -238,14 +239,18 @@ const spreadSessions: SessionWithPlayers[] = [
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
-export default async function RootPage() {
+async function AuthRedirect() {
   const session = await auth();
-  if (session) {
-    redirect("/dashboard");
-  }
+  if (session) redirect("/dashboard");
+  return null;
+}
 
+export default function RootPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      <Suspense>
+        <AuthRedirect />
+      </Suspense>
       {/* ── Navbar ── */}
       <header className="fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
