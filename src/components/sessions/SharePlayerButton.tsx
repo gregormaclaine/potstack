@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 
@@ -12,10 +12,10 @@ interface Props {
   initialStatus: InviteStatus | null;
 }
 
-const statusConfig: Record<InviteStatus, { label: string; classes: string }> = {
-  PENDING:  { label: "Invite pending",  classes: "text-amber-400 border-amber-700 bg-amber-950" },
-  ACCEPTED: { label: "Invite accepted", classes: "text-emerald-400 border-emerald-800 bg-emerald-950" },
-  REJECTED: { label: "Invite rejected", classes: "text-red-400 border-red-800 bg-red-950" },
+const statusConfig: Record<InviteStatus, { label: string; classes: string; icon: ReactNode }> = {
+  PENDING:  { label: "Invite pending",  classes: "text-amber-400 border-amber-700 bg-amber-950",   icon: <PendingIcon /> },
+  ACCEPTED: { label: "Invite accepted", classes: "text-emerald-400 border-emerald-800 bg-emerald-950", icon: <AcceptedIcon /> },
+  REJECTED: { label: "Invite rejected", classes: "text-red-400 border-red-800 bg-red-950",         icon: <RejectedIcon /> },
 };
 
 export default function SharePlayerButton({ sessionId, sessionPlayerId, initialStatus }: Props) {
@@ -24,16 +24,16 @@ export default function SharePlayerButton({ sessionId, sessionPlayerId, initialS
   const router = useRouter();
 
   if (status !== null) {
-    const { label, classes } = statusConfig[status];
+    const { label, classes, icon } = statusConfig[status];
     return (
       <span
         title={label}
         className={clsx(
-          "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
+          "inline-flex items-center rounded-full border p-1",
           classes
         )}
       >
-        {label}
+        {icon}
       </span>
     );
   }
@@ -71,6 +71,32 @@ export default function SharePlayerButton({ sessionId, sessionPlayerId, initialS
       <SendIcon />
       Share
     </button>
+  );
+}
+
+function AcceptedIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function PendingIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function RejectedIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
   );
 }
 

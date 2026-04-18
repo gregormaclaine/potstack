@@ -144,21 +144,40 @@ export default function PlayerRowInput({
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
-      <span className="min-w-0 flex-1 truncate font-medium text-zinc-100">
-        {playerName}
-      </span>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <span className="min-w-0 flex-1 truncate font-medium text-zinc-100">
+          {playerName}
+        </span>
 
-      <LinkStatusChip
-        status={linkStatus}
-        username={linkedUsername}
-        onLink={() => onLink(index)}
-      />
+        <LinkStatusChip
+          status={linkStatus}
+          username={linkedUsername}
+          onLink={() => onLink(index)}
+        />
+      </div>
 
-      <span className="text-zinc-700">|</span>
+      {!tracking && (
+        <button
+          type="button"
+          onClick={enableTracking}
+          className="text-xs text-zinc-500 hover:text-emerald-400 transition-colors"
+        >
+          + Track results
+        </button>
+      )}
 
-      {tracking ? (
-        <>
+      <button
+        type="button"
+        onClick={() => onRemove(index)}
+        className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-red-400 transition-colors"
+        aria-label={`Remove ${playerName}`}
+      >
+        ✕
+      </button>
+
+      {tracking && (
+        <div className="flex w-full items-center gap-2">
           <div className="flex items-center gap-1">
             <span className="text-xs text-zinc-500">Buy-in</span>
             <CurrencyInput
@@ -185,25 +204,8 @@ export default function PlayerRowInput({
           >
             Hide
           </button>
-        </>
-      ) : (
-        <button
-          type="button"
-          onClick={enableTracking}
-          className="text-xs text-zinc-500 hover:text-emerald-400 transition-colors"
-        >
-          + Track results
-        </button>
+        </div>
       )}
-
-      <button
-        type="button"
-        onClick={() => onRemove(index)}
-        className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-red-400 transition-colors"
-        aria-label={`Remove ${playerName}`}
-      >
-        ✕
-      </button>
     </div>
   );
 }
