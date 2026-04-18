@@ -32,6 +32,28 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  if (type === "accepted-received") {
+    const links = await prisma.playerLink.findMany({
+      where: { linkedUserId: userId, status: "ACCEPTED", linkedPlayerId: { not: null } },
+      select: {
+        id: true,
+        status: true,
+        linkedPlayerId: true,
+        ownerUser: { select: { username: true } },
+      },
+    });
+    return NextResponse.json({
+      links: links
+        .filter((l: (typeof links)[number]) => l.linkedPlayerId !== null)
+        .map((l: (typeof links)[number]) => ({
+          id: l.id,
+          status: l.status,
+          playerId: l.linkedPlayerId as number,
+          linkedUsername: l.ownerUser.username,
+        })),
+    });
+  }
+
   if (type === "received") {
     const links = await prisma.playerLink.findMany({
       where: { linkedUserId: userId, status: "PENDING" },

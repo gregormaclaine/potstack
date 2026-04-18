@@ -82,13 +82,18 @@ export default function SessionForm({
   // to call for any candidate regardless of whether they were recently created.
   const playersToCheckRef = useRef(new Set<number>());
 
-  // Fetch all sent links so we know which players are already linked.
+  // Fetch all links (sent + accepted-received) so we know which players are already linked.
   useEffect(() => {
-    fetch("/api/links?type=sent")
-      .then((r) => r.json())
-      .then((data: { links: PlayerLinkSummary[] }) => {
+    Promise.all([
+      fetch("/api/links?type=sent").then((r) => r.json() as Promise<{ links: PlayerLinkSummary[] }>),
+      fetch("/api/links?type=accepted-received").then((r) => r.json() as Promise<{ links: PlayerLinkSummary[] }>),
+    ])
+      .then(([sent, received]) => {
         const map = new Map<number, PlayerLinkSummary>();
-        for (const link of data.links) map.set(link.playerId, link);
+        for (const link of sent.links) map.set(link.playerId, link);
+        for (const link of received.links) {
+          if (!map.has(link.playerId)) map.set(link.playerId, link);
+        }
         setSentLinks(map);
         // Hydrate any default player rows with link info
         setPlayers((prev) =>

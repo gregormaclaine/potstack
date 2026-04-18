@@ -47,8 +47,15 @@ function UserIdentifier() {
   const ph = usePostHog();
 
   useEffect(() => {
-    if (status === "authenticated" && session?.user?.id) {
-      ph.identify(session.user.id, { name: session.user.name ?? undefined });
+    if (status === "authenticated") {
+      if (session?.isImpersonating) {
+        ph.opt_out_capturing();
+        return;
+      }
+      ph.opt_in_capturing();
+      if (session?.user?.id) {
+        ph.identify(session.user.id, { name: session.user.name ?? undefined });
+      }
     }
     if (status === "unauthenticated") {
       ph.reset();

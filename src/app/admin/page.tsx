@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import PageWrapper from "@/components/layout/PageWrapper";
 import StatCard from "@/components/dashboard/StatCard";
+import AdminUsersTable from "@/components/admin/AdminUsersTable";
 
 export const dynamic = "force-dynamic";
 
@@ -70,83 +71,31 @@ export default async function AdminPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-          <h2 className="mb-4 text-sm font-semibold text-zinc-300">
-            Most Active Users
-          </h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-800 text-left text-xs text-zinc-500">
-                <th className="pb-2 font-medium">User</th>
-                <th className="pb-2 font-medium text-right">Sessions</th>
-                <th className="pb-2 font-medium text-right">Players</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800">
-              {topUsers.map((u) => (
-                <tr key={u.id}>
-                  <td className="py-2.5">
-                    <span className="font-medium text-zinc-200">
-                      {u.username}
-                    </span>
-                    {u.isAdmin && (
-                      <span className="ml-2 rounded px-1.5 py-0.5 text-xs font-medium bg-amber-900/40 text-amber-400">
-                        admin
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2.5 text-right tabular-nums text-zinc-400">
-                    {u._count.sessions}
-                  </td>
-                  <td className="py-2.5 text-right tabular-nums text-zinc-400">
-                    {u._count.players}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <AdminUsersTable
+          title="Most Active Users"
+          users={topUsers.map((u) => ({
+            id: u.id,
+            username: u.username,
+            isAdmin: u.isAdmin,
+            sessions: u._count.sessions,
+            players: u._count.players,
+          }))}
+          columns={["sessions", "players"]}
+          currentUserId={session.user.id}
+        />
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-          <h2 className="mb-4 text-sm font-semibold text-zinc-300">
-            Recent Sign-ups
-          </h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-800 text-left text-xs text-zinc-500">
-                <th className="pb-2 font-medium">User</th>
-                <th className="pb-2 font-medium">Joined</th>
-                <th className="pb-2 font-medium text-right">Sessions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800">
-              {recentUsers.map((u) => (
-                <tr key={u.id}>
-                  <td className="py-2.5">
-                    <span className="font-medium text-zinc-200">
-                      {u.username}
-                    </span>
-                    {u.isAdmin && (
-                      <span className="ml-2 rounded px-1.5 py-0.5 text-xs font-medium bg-amber-900/40 text-amber-400">
-                        admin
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2.5 text-zinc-400">
-                    {new Date(u.createdAt).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </td>
-                  <td className="py-2.5 text-right tabular-nums text-zinc-400">
-                    {u._count.sessions}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <AdminUsersTable
+          title="Recent Sign-ups"
+          users={recentUsers.map((u) => ({
+            id: u.id,
+            username: u.username,
+            isAdmin: u.isAdmin,
+            sessions: u._count.sessions,
+            joinedAt: u.createdAt.toISOString(),
+          }))}
+          columns={["joined", "sessions"]}
+          currentUserId={session.user.id}
+        />
       </div>
     </PageWrapper>
   );

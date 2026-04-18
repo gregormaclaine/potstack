@@ -248,38 +248,42 @@ export default function PlayerList({ initialPlayers, initialGroups, initialLinks
         <div className="flex flex-wrap gap-2">
           {groups.map((group) =>
             editingGroupId === group.id ? (
-              <div key={group.id} className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 p-2">
+              <div key={group.id} className="flex w-full flex-col gap-2 rounded-lg border border-zinc-700 bg-zinc-800 p-2 sm:w-auto sm:flex-row sm:items-center">
                 <Input
                   value={editGroupName}
                   onChange={(e) => setEditGroupName(e.target.value)}
                   error={editGroupError}
-                  className="w-32"
+                  className="w-full sm:w-32"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") saveEditGroup(group.id);
                     if (e.key === "Escape") setEditingGroupId(null);
                   }}
                   autoFocus
                 />
-                <div className="flex gap-1">
-                  {COLOR_KEYS.map((c) => (
-                    <button
-                      key={c}
-                      title={c}
-                      onClick={() => setEditGroupColor(c)}
-                      className={clsx(
-                        "h-5 w-5 rounded-full border-2 transition-transform hover:scale-110",
-                        GROUP_COLORS[c].bg,
-                        editGroupColor === c ? "border-white" : "border-transparent"
-                      )}
-                    />
-                  ))}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex gap-1">
+                    {COLOR_KEYS.map((c) => (
+                      <button
+                        key={c}
+                        title={c}
+                        onClick={() => setEditGroupColor(c)}
+                        className={clsx(
+                          "h-5 w-5 rounded-full border-2 transition-transform hover:scale-110",
+                          GROUP_COLORS[c].bg,
+                          editGroupColor === c ? "border-white" : "border-transparent"
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <div className="ml-auto flex gap-1 max-[400px]:ml-0 max-[400px]:w-full max-[400px]:justify-center sm:ml-0">
+                    <Button size="sm" loading={editGroupLoading} onClick={() => saveEditGroup(group.id)}>
+                      Save
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditingGroupId(null)}>
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
-                <Button size="sm" loading={editGroupLoading} onClick={() => saveEditGroup(group.id)}>
-                  Save
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditingGroupId(null)}>
-                  Cancel
-                </Button>
               </div>
             ) : (
               <div key={group.id} className="flex items-center gap-1 rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1.5">
@@ -307,39 +311,43 @@ export default function PlayerList({ initialPlayers, initialGroups, initialLinks
           )}
 
           {showNewGroupForm && (
-            <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 p-2">
+            <div className="flex w-full flex-col gap-2 rounded-lg border border-zinc-700 bg-zinc-800 p-2 sm:w-auto sm:flex-row sm:items-center">
               <Input
                 placeholder="Group name"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
                 error={newGroupError}
-                className="w-36"
+                className="w-full sm:w-36"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") createGroup();
                   if (e.key === "Escape") setShowNewGroupForm(false);
                 }}
                 autoFocus
               />
-              <div className="flex gap-1">
-                {COLOR_KEYS.map((c) => (
-                  <button
-                    key={c}
-                    title={c}
-                    onClick={() => setNewGroupColor(c)}
-                    className={clsx(
-                      "h-5 w-5 rounded-full border-2 transition-transform hover:scale-110",
-                      GROUP_COLORS[c].bg,
-                      newGroupColor === c ? "border-white" : "border-transparent"
-                    )}
-                  />
-                ))}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex gap-1">
+                  {COLOR_KEYS.map((c) => (
+                    <button
+                      key={c}
+                      title={c}
+                      onClick={() => setNewGroupColor(c)}
+                      className={clsx(
+                        "h-5 w-5 rounded-full border-2 transition-transform hover:scale-110",
+                        GROUP_COLORS[c].bg,
+                        newGroupColor === c ? "border-white" : "border-transparent"
+                      )}
+                    />
+                  ))}
+                </div>
+                <div className="ml-auto flex gap-1 sm:ml-0">
+                  <Button size="sm" loading={newGroupLoading} onClick={createGroup}>
+                    Create
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setShowNewGroupForm(false)}>
+                    Cancel
+                  </Button>
+                </div>
               </div>
-              <Button size="sm" loading={newGroupLoading} onClick={createGroup}>
-                Create
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setShowNewGroupForm(false)}>
-                Cancel
-              </Button>
             </div>
           )}
         </div>

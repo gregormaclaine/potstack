@@ -22,16 +22,41 @@ export const authConfig: NextAuthConfig = {
       }
       return true;
     },
-    jwt({ token, user }) {
+    jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.isAdmin = user.isAdmin;
       }
+      if (trigger === "update" && session?.impersonation !== undefined) {
+        if (session.impersonation && token.isAdmin) {
+          token.impersonatedUserId = session.impersonation.userId;
+          token.impersonatedUsername = session.impersonation.username;
+          token.originalIsAdmin = true;
+        } else {
+          delete token.impersonatedUserId;
+          delete token.impersonatedUsername;
+          delete token.originalIsAdmin;
+        }
+      }
       return token;
     },
     session({ session, token }) {
-      if (token.id) session.user.id = token.id as string;
+      const adminId = token.id as string;
+      const adminName = token.name as string;
+
+      if (adminId) session.user.id = adminId;
       session.user.isAdmin = token.isAdmin ?? false;
+      session.isImpersonating = false;
+
+      if (token.impersonatedUserId) {
+        session.user.id = token.impersonatedUserId;
+        session.user.name = token.impersonatedUsername ?? null;
+        session.user.isAdmin = false;
+        session.isImpersonating = true;
+        session.impersonatorId = adminId;
+        session.impersonatorName = adminName;
+      }
+
       return session;
     },
   },
