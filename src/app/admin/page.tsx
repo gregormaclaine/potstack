@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import PageWrapper from "@/components/layout/PageWrapper";
 import StatCard from "@/components/dashboard/StatCard";
 import AdminUsersTable from "@/components/admin/AdminUsersTable";
+import RelationshipGraphWrapper from "@/components/admin/RelationshipGraphWrapper";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,17 @@ export default async function AdminPage() {
           columns={["joined", "sessions"]}
           currentUserId={session.user.id}
         />
+      </div>
+
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold text-zinc-100 mb-1">Relationship Graph</h2>
+        <p className="text-zinc-400 text-sm mb-3">
+          <span className="inline-block w-3 h-3 rounded-full bg-amber-400 mr-1 align-middle" />
+          Users &nbsp;
+          <span className="inline-block w-2 h-2 rounded-full bg-zinc-500 mr-1 align-middle" />
+          Players &mdash; edge thickness reflects shared session history.
+        </p>
+        <RelationshipGraphWrapper />
       </div>
     </PageWrapper>
   );
