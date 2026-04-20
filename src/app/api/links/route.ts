@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
         id: true,
         status: true,
         ownerPlayerId: true,
-        linkedUser: { select: { username: true } },
+        linkedUser: { select: { username: true, avatar: true } },
       },
     });
     return NextResponse.json({
@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
         status: l.status,
         playerId: l.ownerPlayerId,
         linkedUsername: l.linkedUser.username,
+        linkedUserAvatar: l.linkedUser.avatar,
       })),
     });
   }
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
         id: true,
         status: true,
         linkedPlayerId: true,
-        ownerUser: { select: { username: true } },
+        ownerUser: { select: { username: true, avatar: true } },
       },
     });
     return NextResponse.json({
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
           status: l.status,
           playerId: l.linkedPlayerId as number,
           linkedUsername: l.ownerUser.username,
+          linkedUserAvatar: l.ownerUser.avatar,
         })),
     });
   }
@@ -61,7 +63,7 @@ export async function GET(request: NextRequest) {
         id: true,
         status: true,
         createdAt: true,
-        ownerUser: { select: { username: true } },
+        ownerUser: { select: { username: true, avatar: true } },
         ownerPlayer: { select: { name: true } },
       },
     });
@@ -71,6 +73,7 @@ export async function GET(request: NextRequest) {
         status: l.status,
         createdAt: l.createdAt.toISOString(),
         requesterUsername: l.ownerUser.username,
+        requesterAvatar: l.ownerUser.avatar,
         playerName: l.ownerPlayer.name,
       })),
     });

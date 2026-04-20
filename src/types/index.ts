@@ -107,6 +107,7 @@ export interface PlayerLinkSummary {
   id: number;
   status: LinkStatus;
   linkedUsername: string;
+  linkedUserAvatar?: string | null;
   playerId: number;
 }
 
@@ -115,6 +116,7 @@ export interface ReceivedLinkRequest {
   status: LinkStatus;
   createdAt: string;
   requesterUsername: string;
+  requesterAvatar?: string | null;
   playerName: string;
 }
 
@@ -123,6 +125,7 @@ export interface SessionInviteItem {
   status: LinkStatus;
   createdAt: string;
   requesterUsername: string;
+  requesterAvatar?: string | null;
   playerName: string;
   session: { date: string; location: string | null; notes: string | null };
   sessionPlayer: { buyIn: number | null; cashOut: number | null; profit: number | null };

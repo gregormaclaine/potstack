@@ -20,6 +20,7 @@ interface PlayerRow {
   linkId?: number;
   linkStatus?: LinkStatus | null;
   linkedUsername?: string;
+  linkedUserAvatar?: string | null;
   /**
    * True when the link was created during this form session.
    * These players should not be cleaned up as orphans even if removed.
@@ -106,6 +107,7 @@ export default function SessionForm({
               linkId: link.id,
               linkStatus: link.status,
               linkedUsername: link.linkedUsername,
+              linkedUserAvatar: link.linkedUserAvatar ?? null,
             };
           })
         );
@@ -140,6 +142,7 @@ export default function SessionForm({
         linkId: link?.id,
         linkStatus: link?.status ?? null,
         linkedUsername: link?.linkedUsername,
+        linkedUserAvatar: link?.linkedUserAvatar ?? null,
       },
     ]);
   }
@@ -184,6 +187,7 @@ export default function SessionForm({
           linkId: link.id,
           linkStatus: link.status,
           linkedUsername: link.linkedUsername,
+          linkedUserAvatar: link.linkedUserAvatar ?? null,
           newlyLinked: true,
         };
       })
@@ -199,7 +203,7 @@ export default function SessionForm({
     setPlayers((prev) =>
       prev.map((p) => {
         if (p.playerId !== playerId) return p;
-        return { ...p, linkId: undefined, linkStatus: null, linkedUsername: undefined, newlyLinked: false };
+        return { ...p, linkId: undefined, linkStatus: null, linkedUsername: undefined, linkedUserAvatar: null, newlyLinked: false };
       })
     );
   }
@@ -396,6 +400,7 @@ export default function SessionForm({
                   cashOut={player.cashOut}
                   linkStatus={player.linkStatus}
                   linkedUsername={player.linkedUsername}
+                  linkedUserAvatar={player.linkedUserAvatar}
                   onChangeBuyIn={changePlayerBuyIn}
                   onChangeCashOut={changePlayerCashOut}
                   onRemove={removePlayer}

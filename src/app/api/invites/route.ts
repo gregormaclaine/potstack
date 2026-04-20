@@ -17,7 +17,7 @@ export async function GET() {
       link: {
         include: {
           ownerPlayer: { select: { name: true } },
-          ownerUser: { select: { username: true } },
+          ownerUser: { select: { username: true, avatar: true } },
         },
       },
     },
@@ -29,6 +29,7 @@ export async function GET() {
     status: inv.status,
     createdAt: inv.createdAt.toISOString(),
     requesterUsername: inv.link.ownerUser.username,
+    requesterAvatar: inv.link.ownerUser.avatar,
     playerName: inv.link.ownerPlayer.name,
     session: {
       date: inv.session.date.toISOString(),

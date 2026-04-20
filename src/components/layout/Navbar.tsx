@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { clsx } from "clsx";
 import InviteBadge from "@/components/layout/InviteBadge";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 const links = [
   { href: "/dashboard", label: "Dashboard" },
@@ -94,16 +95,27 @@ export default function Navbar() {
             onMouseEnter={handleMenuEnter}
             onMouseLeave={handleMenuLeave}
           >
-            <button className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-zinc-200">
+            <button className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-zinc-200">
+              <UserAvatar avatarId={session.user.avatar} size="xs" />
               <span className="font-bold">{session.user.name}</span>
               <InviteBadge />
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-full z-50 pt-1">
                 <div className="min-w-44 rounded-xl border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
-                  <div className="border-b border-zinc-800 px-4 py-2">
+                  <div className="flex items-center gap-2.5 border-b border-zinc-800 px-4 py-2.5">
+                    <UserAvatar avatarId={session.user.avatar} size="sm" />
                     <p className="text-sm font-bold text-zinc-200">@{session.user.name}</p>
                   </div>
+                  <Link
+                    href="/profile"
+                    className={clsx(
+                      "flex items-center gap-1.5 px-4 py-2 text-sm transition-colors hover:bg-zinc-800",
+                      pathname === "/profile" ? "text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
+                    )}
+                  >
+                    Profile
+                  </Link>
                   <Link
                     href="/notifications"
                     className={clsx(
@@ -191,9 +203,24 @@ export default function Navbar() {
           {/* Mobile user section — always visible in hamburger */}
           {session?.user && (
             <div className="mt-3 border-t border-zinc-800 pt-3 space-y-1">
-              <p className="px-3 py-1 text-xs font-bold text-zinc-600">
-                @{session.user.name}
-              </p>
+              <div className="flex items-center gap-2 px-3 py-1">
+                <UserAvatar avatarId={session.user.avatar} size="xs" />
+                <p className="text-xs font-bold text-zinc-600">
+                  @{session.user.name}
+                </p>
+              </div>
+              <Link
+                href="/profile"
+                onClick={() => setOpen(false)}
+                className={clsx(
+                  "flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  pathname === "/profile"
+                    ? "bg-zinc-800 text-zinc-100"
+                    : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
+                )}
+              >
+                Profile
+              </Link>
               <Link
                 href="/notifications"
                 onClick={() => setOpen(false)}

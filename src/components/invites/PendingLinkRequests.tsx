@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import UserAvatar from "@/components/ui/UserAvatar";
 import type { ReceivedLinkRequest } from "@/types";
 
 interface MyPlayer {
@@ -109,12 +110,15 @@ export default function PendingLinkRequests({ initialRequests, myPlayers }: Pend
             className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 space-y-3"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-zinc-300">
-                <span className="font-medium text-zinc-100">@{req.requesterUsername}</span> wants
-                to link their player{" "}
-                <span className="font-medium text-zinc-100">&ldquo;{req.playerName}&rdquo;</span>{" "}
-                to your account.
-              </p>
+              <div className="flex items-center gap-2 text-sm text-zinc-300">
+                <UserAvatar avatarId={req.requesterAvatar} size="sm" />
+                <p>
+                  <span className="font-medium text-zinc-100">@{req.requesterUsername}</span> wants
+                  to link their player{" "}
+                  <span className="font-medium text-zinc-100">&ldquo;{req.playerName}&rdquo;</span>{" "}
+                  to your account.
+                </p>
+              </div>
               {!isPicking && (
                 <div className="flex gap-2">
                   <Button

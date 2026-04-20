@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Badge from "@/components/ui/Badge";
+import UserAvatar from "@/components/ui/UserAvatar";
 import type { LinkStatus } from "@/types";
 
 interface PlayerRowInputProps {
@@ -9,6 +10,7 @@ interface PlayerRowInputProps {
   cashOut: number | null;
   linkStatus?: LinkStatus | null;
   linkedUsername?: string;
+  linkedUserAvatar?: string | null;
   onChangeBuyIn: (index: number, value: number | null) => void;
   onChangeCashOut: (index: number, value: number | null) => void;
   onRemove: (index: number) => void;
@@ -64,10 +66,12 @@ function CurrencyInput({
 function LinkStatusChip({
   status,
   username,
+  avatar,
   onLink,
 }: {
   status?: LinkStatus | null;
   username?: string;
+  avatar?: string | null;
   onLink: () => void;
 }) {
   if (status === "ACCEPTED") {
@@ -76,9 +80,9 @@ function LinkStatusChip({
         type="button"
         onClick={onLink}
         title={`Linked to @${username}`}
-        className="flex items-center gap-1 rounded-full bg-emerald-600/20 px-2 py-0.5 text-xs font-medium text-emerald-400 hover:bg-emerald-600/30 transition-colors"
+        className="flex items-center gap-1 rounded-full bg-emerald-600/20 px-1.5 py-0.5 text-xs font-medium text-emerald-400 hover:bg-emerald-600/30 transition-colors"
       >
-        <span>⇄</span>
+        <UserAvatar avatarId={avatar} size="xs" />
         <span>@{username}</span>
       </button>
     );
@@ -89,9 +93,9 @@ function LinkStatusChip({
         type="button"
         onClick={onLink}
         title={`Pending link request to @${username}`}
-        className="flex items-center gap-1 rounded-full bg-yellow-600/20 px-2 py-0.5 text-xs font-medium text-yellow-400 hover:bg-yellow-600/30 transition-colors"
+        className="flex items-center gap-1 rounded-full bg-yellow-600/20 px-1.5 py-0.5 text-xs font-medium text-yellow-400 hover:bg-yellow-600/30 transition-colors"
       >
-        <span>⋯</span>
+        <UserAvatar avatarId={avatar} size="xs" />
         <span>@{username}</span>
       </button>
     );
@@ -102,9 +106,9 @@ function LinkStatusChip({
         type="button"
         onClick={onLink}
         title="Link request was rejected — click to manage"
-        className="flex items-center gap-1 rounded-full bg-red-600/20 px-2 py-0.5 text-xs font-medium text-red-400 hover:bg-red-600/30 transition-colors"
+        className="flex items-center gap-1 rounded-full bg-red-600/20 px-1.5 py-0.5 text-xs font-medium text-red-400 hover:bg-red-600/30 transition-colors"
       >
-        <span>✕</span>
+        <UserAvatar avatarId={avatar} size="xs" />
         <span>@{username}</span>
       </button>
     );
@@ -128,6 +132,7 @@ export default function PlayerRowInput({
   cashOut,
   linkStatus,
   linkedUsername,
+  linkedUserAvatar,
   onChangeBuyIn,
   onChangeCashOut,
   onRemove,
@@ -156,6 +161,7 @@ export default function PlayerRowInput({
         <LinkStatusChip
           status={linkStatus}
           username={linkedUsername}
+          avatar={linkedUserAvatar}
           onLink={() => onLink(index)}
         />
       </div>

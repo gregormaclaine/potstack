@@ -9,6 +9,7 @@ import Modal from "@/components/ui/Modal";
 import LinkPlayerModal from "@/components/players/LinkPlayerModal";
 import AddLinkedPlayerModal from "@/components/players/AddLinkedPlayerModal";
 import { formatDate } from "@/lib/formatters";
+import UserAvatar from "@/components/ui/UserAvatar";
 import type { PlayerWithStats, PlayerGroup, PlayerLinkSummary } from "@/types";
 
 // Fixed colour palette for groups
@@ -491,9 +492,7 @@ export default function PlayerList({ initialPlayers, initialGroups, initialLinks
                             ? "text-yellow-400"
                             : "text-red-400"
                         )}>
-                          <span>
-                            {links.get(player.id)!.status === "ACCEPTED" ? "⇄" : links.get(player.id)!.status === "PENDING" ? "⋯" : "✕"}
-                          </span>
+                          <UserAvatar avatarId={links.get(player.id)!.linkedUserAvatar} size="xs" />
                           <span>@{links.get(player.id)!.linkedUsername}</span>
                         </span>
                       ) : (

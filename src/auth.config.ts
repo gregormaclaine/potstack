@@ -26,16 +26,24 @@ export const authConfig: NextAuthConfig = {
       if (user) {
         token.id = user.id;
         token.isAdmin = user.isAdmin;
+        token.avatar = user.avatar ?? null;
       }
-      if (trigger === "update" && session?.impersonation !== undefined) {
-        if (session.impersonation && token.isAdmin) {
-          token.impersonatedUserId = session.impersonation.userId;
-          token.impersonatedUsername = session.impersonation.username;
-          token.originalIsAdmin = true;
-        } else {
-          delete token.impersonatedUserId;
-          delete token.impersonatedUsername;
-          delete token.originalIsAdmin;
+      if (trigger === "update") {
+        if (session?.avatar !== undefined) {
+          token.avatar = session.avatar;
+        }
+        if (session?.impersonation !== undefined) {
+          if (session.impersonation && token.isAdmin) {
+            token.impersonatedUserId = session.impersonation.userId;
+            token.impersonatedUsername = session.impersonation.username;
+            token.impersonatedAvatar = session.impersonation.avatar ?? null;
+            token.originalIsAdmin = true;
+          } else {
+            delete token.impersonatedUserId;
+            delete token.impersonatedUsername;
+            delete token.impersonatedAvatar;
+            delete token.originalIsAdmin;
+          }
         }
       }
       return token;
@@ -46,12 +54,14 @@ export const authConfig: NextAuthConfig = {
 
       if (adminId) session.user.id = adminId;
       session.user.isAdmin = token.isAdmin ?? false;
+      session.user.avatar = token.avatar ?? null;
       session.isImpersonating = false;
 
       if (token.impersonatedUserId) {
         session.user.id = token.impersonatedUserId;
         session.user.name = token.impersonatedUsername ?? null;
         session.user.isAdmin = false;
+        session.user.avatar = token.impersonatedAvatar ?? null;
         session.isImpersonating = true;
         session.impersonatorId = adminId;
         session.impersonatorName = adminName;

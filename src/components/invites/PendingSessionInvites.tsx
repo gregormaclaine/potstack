@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import UserAvatar from "@/components/ui/UserAvatar";
 import { formatDate, formatCurrency } from "@/lib/formatters";
 import type { SessionInviteItem } from "@/types";
 
@@ -55,8 +56,11 @@ export default function PendingSessionInvites({ initialInvites }: PendingSession
                     <span className="ml-2 font-normal text-zinc-400">@ {inv.session.location}</span>
                   )}
                 </p>
-                <p className="text-xs text-zinc-500">
-                  from <span className="text-zinc-400">@{inv.requesterUsername}</span> — playing as{" "}
+                <p className="flex items-center gap-1.5 text-xs text-zinc-500">
+                  from
+                  <UserAvatar avatarId={inv.requesterAvatar} size="xs" />
+                  <span className="text-zinc-400">@{inv.requesterUsername}</span>
+                  — playing as{" "}
                   <span className="text-zinc-400">{inv.playerName}</span>
                 </p>
               </div>
