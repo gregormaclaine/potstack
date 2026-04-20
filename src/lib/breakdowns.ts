@@ -338,7 +338,11 @@ export function buildCumulativeByPlayer(
 
   // Build cumulative points
   const cumulative = new Map<string, number>(allKeys.map((k) => [k, 0]));
-  const points: CumulativePlayerPoint[] = [];
+
+  // Zero-origin point (sessionIndex 0, same date as first session)
+  const zeroPoint: CumulativePlayerPoint = { sessionIndex: 0, date: filteredSessions[0].date };
+  for (const key of allKeys) zeroPoint[key] = 0;
+  const points: CumulativePlayerPoint[] = [zeroPoint];
 
   for (let i = 0; i < filteredSessions.length; i++) {
     const session = filteredSessions[i];

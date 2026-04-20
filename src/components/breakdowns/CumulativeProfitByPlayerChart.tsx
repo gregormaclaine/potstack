@@ -36,7 +36,7 @@ export default function CumulativeProfitByPlayerChart({
         <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
         <XAxis
           dataKey="sessionIndex"
-          tickFormatter={(v) => formatDate(points[(v as number) - 1]?.date ?? "", "d MMM")}
+          tickFormatter={(v) => formatDate(points[v as number]?.date ?? "", "d MMM")}
           tick={{ fill: "#71717a", fontSize: 11 }}
           axisLine={{ stroke: "#27272a" }}
           tickLine={false}
@@ -56,8 +56,10 @@ export default function CumulativeProfitByPlayerChart({
             fontSize: 12,
           }}
           labelFormatter={(v) => {
-            const pt = points[(v as number) - 1];
-            return pt ? `Session ${v} — ${formatDate(pt.date)}` : `Session ${v}`;
+            const pt = points[v as number];
+            if (!pt) return `Session ${v as number}`;
+            if ((v as number) === 0) return `Start — ${formatDate(pt.date)}`;
+            return `Session ${v as number} — ${formatDate(pt.date)}`;
           }}
           formatter={(value, name) => {
             const player = players.find((p) => p.key === name);
