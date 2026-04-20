@@ -30,12 +30,12 @@ export default async function PlayersPage() {
     // Links I sent: any status, keyed by my player
     prisma.playerLink.findMany({
       where: { ownerUserId: userId },
-      select: { id: true, ownerPlayerId: true, status: true, linkedUser: { select: { username: true } } },
+      select: { id: true, ownerPlayerId: true, status: true, linkedUser: { select: { username: true, avatar: true } } },
     }),
     // Links I received and accepted: keyed by my player (linkedPlayerId)
     prisma.playerLink.findMany({
       where: { linkedUserId: userId, status: "ACCEPTED", linkedPlayerId: { not: null } },
-      select: { id: true, linkedPlayerId: true, status: true, ownerUser: { select: { username: true } } },
+      select: { id: true, linkedPlayerId: true, status: true, ownerUser: { select: { username: true, avatar: true } } },
     }),
   ]);
 
@@ -59,12 +59,12 @@ export default async function PlayersPage() {
 
   const initialLinks = new Map<number, PlayerLinkSummary>();
   for (const l of rawSentLinks) {
-    initialLinks.set(l.ownerPlayerId, { id: l.id, status: l.status as LinkStatus, linkedUsername: l.linkedUser.username, playerId: l.ownerPlayerId });
+    initialLinks.set(l.ownerPlayerId, { id: l.id, status: l.status as LinkStatus, linkedUsername: l.linkedUser.username, linkedUserAvatar: l.linkedUser.avatar, playerId: l.ownerPlayerId });
   }
   // Received accepted links: only add if not already covered by a sent link for the same player
   for (const l of rawReceivedLinks) {
     if (l.linkedPlayerId !== null && !initialLinks.has(l.linkedPlayerId)) {
-      initialLinks.set(l.linkedPlayerId, { id: l.id, status: "ACCEPTED", linkedUsername: l.ownerUser.username, playerId: l.linkedPlayerId });
+      initialLinks.set(l.linkedPlayerId, { id: l.id, status: "ACCEPTED", linkedUsername: l.ownerUser.username, linkedUserAvatar: l.ownerUser.avatar, playerId: l.linkedPlayerId });
     }
   }
 
