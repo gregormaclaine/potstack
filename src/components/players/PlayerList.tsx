@@ -483,18 +483,18 @@ export default function PlayerList({ initialPlayers, initialGroups, initialLinks
                   >
                     <Button size="sm" variant="ghost" onClick={() => setLinkingPlayer(player)}>
                       {links.has(player.id) ? (
-                        <span className="flex items-center gap-1">
-                          <span
-                            className={clsx(
-                              "inline-block h-1.5 w-1.5 rounded-full",
-                              links.get(player.id)!.status === "ACCEPTED"
-                                ? "bg-emerald-400"
-                                : links.get(player.id)!.status === "PENDING"
-                                ? "bg-yellow-400"
-                                : "bg-red-400"
-                            )}
-                          />
-                          {links.get(player.id)!.status === "PENDING" ? "Linking" : "Linked"}
+                        <span className={clsx(
+                          "flex items-center gap-1 font-medium",
+                          links.get(player.id)!.status === "ACCEPTED"
+                            ? "text-emerald-400"
+                            : links.get(player.id)!.status === "PENDING"
+                            ? "text-yellow-400"
+                            : "text-red-400"
+                        )}>
+                          <span>
+                            {links.get(player.id)!.status === "ACCEPTED" ? "⇄" : links.get(player.id)!.status === "PENDING" ? "⋯" : "✕"}
+                          </span>
+                          <span>@{links.get(player.id)!.linkedUsername}</span>
                         </span>
                       ) : (
                         "Link"
