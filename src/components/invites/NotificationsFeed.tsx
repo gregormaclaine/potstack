@@ -316,9 +316,10 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
     unresolvedMappings: Array<{ fromPlayerId: number; player: ComboboxPlayer | null }>,
     isOverwrite = false,
     existingSessionId?: number,
+    button = "accept",
   ) {
     setInvitePhase(notifId, { phase: "submitting" });
-    setLoadingId(notifId);
+    setLoadingAction({ notifId, button });
 
     const playerMappings: PlayerMapping[] = unresolvedMappings
       .filter((m) => m.player !== null)
@@ -358,12 +359,12 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
       }
       setInvitePhase(notifId, { phase: "idle" });
     } finally {
-      setLoadingId(null);
+      setLoadingAction(null);
     }
   }
 
   async function rejectInvite(notifId: number, inviteId: number) {
-    setLoadingId(notifId);
+    setLoadingAction({ notifId, button: "reject" });
     try {
       const res = await fetch(`/api/invites/${inviteId}`, {
         method: "PATCH",
@@ -383,7 +384,7 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
         });
       }
     } finally {
-      setLoadingId(null);
+      setLoadingAction(null);
     }
   }
 
@@ -395,7 +396,7 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
     <ul className="space-y-3">
       {notifList.map((notif) => {
         const { id, type, data, sessionId, link, invite, createdAt } = notif;
-        const isLoading = loadingId === id;
+        const loadingButton = loadingAction?.notifId === id ? loadingAction.button : null;
 
         // ── Link request received (actionable) ────────────────────────────────
         if (type === "link_request_received") {
@@ -411,7 +412,7 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
               d={d}
               linkPending={linkPending}
               isAccepting={isAccepting}
-              isLoading={isLoading}
+              loadingButton={loadingButton}
               myPlayers={myPlayers}
               selectedPlayer={selectedPlayer}
               pickError={pickError}
@@ -439,7 +440,7 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
               sessionId={sessionId}
               invitePending={invitePending}
               invitePhase={invitePhase}
-              isLoading={isLoading}
+              loadingButton={loadingButton}
               myPlayers={myPlayers}
               error={err}
               createdAt={createdAt}
@@ -526,7 +527,7 @@ function LinkRequestReceivedCard({
   d,
   linkPending,
   isAccepting,
-  isLoading,
+  loadingButton,
   myPlayers,
   selectedPlayer,
   pickError,
@@ -540,7 +541,7 @@ function LinkRequestReceivedCard({
   d: LinkRequestReceivedData;
   linkPending: boolean;
   isAccepting: boolean;
-  isLoading: boolean;
+  loadingButton: string | null;
   myPlayers: { id: number; name: string }[];
   selectedPlayer: ComboboxPlayer | null;
   pickError: string;
@@ -569,7 +570,7 @@ function LinkRequestReceivedCard({
 
       {linkPending && !isAccepting && (
         <div className="flex justify-end gap-2">
-          <Button size="sm" variant="ghost" loading={isLoading} onClick={() => onReject(linkId)}>Reject</Button>
+          <Button size="sm" variant="ghost" loading={loadingButton === "reject"} onClick={() => onReject(linkId)}>Reject</Button>
           <Button size="sm" onClick={onStartAccept}>Accept</Button>
         </div>
       )}
@@ -588,7 +589,7 @@ function LinkRequestReceivedCard({
           {pickError && <p className="text-sm text-red-400">{pickError}</p>}
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="ghost" onClick={onCancelAccept}>Cancel</Button>
-            <Button size="sm" loading={isLoading} onClick={() => onConfirmAccept(linkId)}>Confirm</Button>
+            <Button size="sm" loading={loadingButton === "confirm"} onClick={() => onConfirmAccept(linkId)}>Confirm</Button>
           </div>
         </div>
       )}
@@ -625,7 +626,7 @@ function SessionInviteReceivedCard({
   sessionId,
   invitePending,
   invitePhase,
-  isLoading,
+  loadingButton,
   myPlayers,
   error,
   createdAt,
@@ -641,12 +642,12 @@ function SessionInviteReceivedCard({
   sessionId: number | null;
   invitePending: boolean;
   invitePhase: InviteAcceptPhase;
-  isLoading: boolean;
+  loadingButton: string | null;
   myPlayers: { id: number; name: string }[];
   error: string | undefined;
   createdAt: string;
   duplicateCheck: DuplicateCheckState | undefined;
-  onStartAccept: (isOverwrite: boolean, existingSessionId?: number) => void;
+  onStartAccept: (isOverwrite: boolean, existingSessionId?: number, button?: string) => void;
   onReject: () => void;
   onMappingChange: (fromPlayerId: number, player: ComboboxPlayer | null) => void;
   onCancelMapping: () => void;
@@ -679,7 +680,7 @@ function SessionInviteReceivedCard({
     if (financialsDiffer) {
       setOverwriteConfirmOpen(true);
     } else {
-      onStartAccept(true, dupResult.sessionId);
+      onStartAccept(true, dupResult.sessionId, "update");
     }
   }
 
@@ -716,7 +717,7 @@ function SessionInviteReceivedCard({
             <div className="flex gap-2">
               {(!duplicateCheck || duplicateCheck.status === "checking") ? (
                 <>
-                  <Button size="sm" variant="ghost" loading={isLoading} onClick={onReject}>Reject</Button>
+                  <Button size="sm" variant="ghost" loading={loadingButton === "reject"} onClick={onReject}>Reject</Button>
                   <span className="flex items-center gap-1.5 text-xs text-zinc-500">
                     <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-400" />
                     Checking…
@@ -724,8 +725,8 @@ function SessionInviteReceivedCard({
                 </>
               ) : dupResult === null ? (
                 <>
-                  <Button size="sm" variant="ghost" loading={isLoading} onClick={onReject}>Reject</Button>
-                  <Button size="sm" loading={isLoading} onClick={() => onStartAccept(false)}>Accept</Button>
+                  <Button size="sm" variant="ghost" loading={loadingButton === "reject"} onClick={onReject}>Reject</Button>
+                  <Button size="sm" loading={loadingButton === "accept"} onClick={() => onStartAccept(false, undefined, "accept")}>Accept</Button>
                 </>
               ) : null}
             </div>
@@ -740,11 +741,11 @@ function SessionInviteReceivedCard({
                 </Link>
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="ghost" loading={isLoading} onClick={onReject}>Reject</Button>
-                <Button size="sm" variant="ghost" loading={isLoading} onClick={() => onStartAccept(false)}>
+                <Button size="sm" variant="ghost" loading={loadingButton === "reject"} onClick={onReject}>Reject</Button>
+                <Button size="sm" variant="ghost" loading={loadingButton === "save-as-new"} onClick={() => onStartAccept(false, undefined, "save-as-new")}>
                   Save as new
                 </Button>
-                <Button size="sm" loading={isLoading} onClick={handleOverwriteClick}>
+                <Button size="sm" loading={loadingButton === "update"} onClick={handleOverwriteClick}>
                   Update existing
                 </Button>
               </div>
