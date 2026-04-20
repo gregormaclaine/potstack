@@ -1,11 +1,13 @@
 "use client";
 
 import ImpersonateButton from "./ImpersonateButton";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 type User = {
   id: number;
   username: string;
   isAdmin: boolean;
+  avatar?: string | null;
   sessions?: number;
   players?: number;
   joinedAt?: string;
@@ -47,12 +49,15 @@ export default function AdminUsersTable({
           {users.map((u) => (
             <tr key={u.id}>
               <td className="py-2.5">
-                <span className="font-medium text-zinc-200">{u.username}</span>
-                {u.isAdmin && (
-                  <span className="ml-2 rounded px-1.5 py-0.5 text-xs font-medium bg-amber-900/40 text-amber-400">
-                    admin
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  <UserAvatar avatarId={u.avatar} size="xs" />
+                  <span className="font-medium text-zinc-200">{u.username}</span>
+                  {u.isAdmin && (
+                    <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-amber-900/40 text-amber-400">
+                      admin
+                    </span>
+                  )}
+                </div>
               </td>
               {columns.includes("joined") && (
                 <td className="py-2.5 text-zinc-400">

@@ -35,6 +35,7 @@ export default async function AdminPage() {
       select: {
         id: true,
         username: true,
+        avatar: true,
         createdAt: true,
         isAdmin: true,
         _count: { select: { sessions: true, players: true } },
@@ -46,6 +47,7 @@ export default async function AdminPage() {
       select: {
         id: true,
         username: true,
+        avatar: true,
         createdAt: true,
         isAdmin: true,
         _count: { select: { sessions: true } },
@@ -77,6 +79,7 @@ export default async function AdminPage() {
           users={topUsers.map((u) => ({
             id: u.id,
             username: u.username,
+            avatar: u.avatar,
             isAdmin: u.isAdmin,
             sessions: u._count.sessions,
             players: u._count.players,
@@ -90,6 +93,7 @@ export default async function AdminPage() {
           users={recentUsers.map((u) => ({
             id: u.id,
             username: u.username,
+            avatar: u.avatar,
             isAdmin: u.isAdmin,
             sessions: u._count.sessions,
             joinedAt: u.createdAt.toISOString(),
