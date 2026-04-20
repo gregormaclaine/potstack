@@ -20,9 +20,11 @@ interface PlayerRowInputProps {
 function CurrencyInput({
   value,
   onChange,
+  autoFocus,
 }: {
   value: number | null;
   onChange: (v: number) => void;
+  autoFocus?: boolean;
 }) {
   const [raw, setRaw] = useState(value === null ? "" : String(value));
 
@@ -52,6 +54,7 @@ function CurrencyInput({
           setRaw(String(final));
           onChange(final);
         }}
+        autoFocus={autoFocus}
         className="w-24 rounded border border-zinc-700 bg-zinc-800 py-1.5 pl-5 pr-2 text-right text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
       />
     </div>
@@ -183,6 +186,7 @@ export default function PlayerRowInput({
             <CurrencyInput
               value={buyIn}
               onChange={(v) => onChangeBuyIn(index, v)}
+              autoFocus
             />
           </div>
 

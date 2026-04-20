@@ -24,10 +24,12 @@ export default async function InvitesPage() {
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
-    prisma.notification.updateMany({
-      where: { userId, read: false },
-      data: { read: true },
-    }),
+    ...(session!.isImpersonating
+      ? []
+      : [prisma.notification.updateMany({
+          where: { userId, read: false },
+          data: { read: true },
+        })]),
   ]);
 
   const notifications: NotificationRow[] = rawNotifications.map((n) => ({

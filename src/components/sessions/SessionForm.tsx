@@ -402,6 +402,35 @@ export default function SessionForm({
                   onLink={setLinkingIndex}
                 />
               ))}
+              {(() => {
+                const trackedPlayers = players.filter((p) => p.buyIn !== null);
+                if (trackedPlayers.length === 0) return null;
+                const playersTotal = trackedPlayers.reduce(
+                  (sum, p) => sum + (p.cashOut ?? 0) - (p.buyIn ?? 0),
+                  0
+                );
+                const sessionTotal = myProfit + playersTotal;
+                const isBalanced = Math.abs(sessionTotal) < 0.005;
+                return (
+                  <div className="flex items-center justify-between border-t border-zinc-800 px-1 pt-2">
+                    <span className="text-xs text-zinc-500">
+                      Session total{" "}
+                      <span className="text-zinc-600">(should be £0)</span>
+                    </span>
+                    <span
+                      className={clsx(
+                        "text-sm font-semibold tabular-nums",
+                        isBalanced && "text-zinc-400",
+                        !isBalanced && sessionTotal > 0 && "text-amber-400",
+                        !isBalanced && sessionTotal < 0 && "text-red-400"
+                      )}
+                    >
+                      {isBalanced ? "✓ " : sessionTotal > 0 ? "+" : ""}
+                      {formatCurrency(isBalanced ? 0 : sessionTotal)}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
