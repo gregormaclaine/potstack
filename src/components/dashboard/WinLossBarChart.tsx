@@ -11,7 +11,8 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { formatDate, formatCurrency } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type { WinLossPoint } from "@/types";
 
 interface WinLossBarChartProps {
@@ -26,6 +27,7 @@ function ProfitTooltip({
   label?: string;
   payload?: Array<{ value?: number; payload?: WinLossPoint }>;
 }) {
+  const { formatCurrency } = useFormatCurrency();
   if (!active || !payload?.length) return null;
 
   const value = Number(payload[0]?.value ?? 0);
@@ -41,6 +43,7 @@ function ProfitTooltip({
 }
 
 export default function WinLossBarChart({ data }: WinLossBarChartProps) {
+  const { formatCurrency } = useFormatCurrency();
   if (data.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-zinc-500">

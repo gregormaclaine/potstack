@@ -9,7 +9,8 @@ import AvgProfitChart from "@/components/breakdowns/AvgProfitChart";
 import WinRateChart from "@/components/breakdowns/WinRateChart";
 import { GROUP_COLORS } from "@/components/players/PlayerList";
 import { buildPlayerBreakdowns, buildGroupBreakdowns } from "@/lib/breakdowns";
-import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { formatPercent } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type {
   SessionWithPlayers,
   PlayerGroup,
@@ -74,6 +75,7 @@ export default function BreakdownsView({
   playerGroupMap,
   groups,
 }: BreakdownsViewProps) {
+  const { formatCurrency } = useFormatCurrency();
   const statsEnabled = useFeatureFlagEnabled("stats-analysis-page");
   const [mode, setMode] = useState<"player" | "group">("player");
   const [sortKey, setSortKey] = useState<SortKey>("sessions");

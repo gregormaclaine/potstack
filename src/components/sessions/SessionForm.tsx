@@ -7,7 +7,7 @@ import Input from "@/components/ui/Input";
 import PlayerRowInput from "./PlayerRowInput";
 import PlayerSearchCombobox from "@/components/players/PlayerSearchCombobox";
 import LinkPlayerModal from "@/components/players/LinkPlayerModal";
-import { formatCurrency } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import { clsx } from "clsx";
 import type { LinkStatus, PlayerLinkSummary } from "@/types";
 
@@ -48,6 +48,7 @@ export default function SessionForm({
   returnUrl = "/sessions",
   defaultValues,
 }: SessionFormProps) {
+  const { formatCurrency } = useFormatCurrency();
   const router = useRouter();
 
   const [date, setDate] = useState(

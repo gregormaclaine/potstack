@@ -12,7 +12,8 @@ import EventHeader from "@/components/events/EventHeader";
 import { getEventColor } from "@/components/events/eventColors";
 import { GROUP_COLORS } from "@/components/players/PlayerList";
 import { getSessionPredominantGroups, type SessionGroupLabel } from "@/lib/breakdowns";
-import { formatDate, formatCurrency } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type { SessionWithPlayers, PokerEvent } from "@/types";
 
 function GroupChip({ group }: { group: SessionGroupLabel }) {
@@ -39,6 +40,7 @@ function SessionRow({ session, onEdit, onDelete }: {
   onEdit: (id: number) => void;
   onDelete: (id: number) => void;
 }) {
+  const { formatCurrency } = useFormatCurrency();
   return (
     <tr className="block bg-zinc-950 transition-colors hover:bg-zinc-900/50 sm:table-row">
       <td className="block px-4 pt-3 pb-0 sm:table-cell sm:py-3 sm:pb-3">

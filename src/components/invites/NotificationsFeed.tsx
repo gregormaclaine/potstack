@@ -6,7 +6,8 @@ import { clsx } from "clsx";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
-import { formatDate, formatCurrency } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type {
   NotificationRow,
   NotificationData,
@@ -653,6 +654,7 @@ function SessionInviteReceivedCard({
   onCancelMapping: () => void;
   onSubmitMapping: () => void;
 }) {
+  const { formatCurrency } = useFormatCurrency();
   const [viewOpen, setViewOpen] = useState(false);
   const [viewData, setViewData] = useState<InviteSessionDetail | null>(null);
   const [viewLoading, setViewLoading] = useState(false);

@@ -12,7 +12,7 @@ import {
   useXAxisScale,
   useYAxisScale,
 } from "recharts";
-import { formatCurrency } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type { SessionWithPlayers } from "@/types";
 
 interface BoxStat {
@@ -50,7 +50,7 @@ function niceTicks(min: number, max: number, targetCount = 5): number[] {
   return ticks;
 }
 
-function buildBoxData(sessions: SessionWithPlayers[]): BoxStat[] {
+function buildBoxData(sessions: SessionWithPlayers[], formatCurrency: (v: number) => string): BoxStat[] {
   const groups = new Map<number, number[]>();
   for (const s of sessions) {
     const existing = groups.get(s.buyIn) ?? [];
@@ -149,6 +149,7 @@ function BoxTooltip({
   label?: string;
   data: BoxStat[];
 }) {
+  const { formatCurrency } = useFormatCurrency();
   if (!active || !label) return null;
   const stat = data.find((d) => d.label === label);
   if (!stat) return null;
@@ -180,7 +181,8 @@ function BoxTooltip({
 }
 
 export default function ProfitSpreadChart({ sessions }: { sessions: SessionWithPlayers[] }) {
-  const boxData = buildBoxData(sessions);
+  const { formatCurrency } = useFormatCurrency();
+  const boxData = buildBoxData(sessions, formatCurrency);
 
   if (boxData.length === 0) {
     return (

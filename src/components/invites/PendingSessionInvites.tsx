@@ -4,7 +4,8 @@ import { useState } from "react";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import UserAvatar from "@/components/ui/UserAvatar";
-import { formatDate, formatCurrency } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type { SessionInviteItem } from "@/types";
 
 interface PendingSessionInvitesProps {
@@ -12,6 +13,7 @@ interface PendingSessionInvitesProps {
 }
 
 export default function PendingSessionInvites({ initialInvites }: PendingSessionInvitesProps) {
+  const { formatCurrency } = useFormatCurrency();
   const [invites, setInvites] = useState(initialInvites);
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [acceptedIds, setAcceptedIds] = useState<Set<number>>(new Set());

@@ -6,7 +6,7 @@ import {
   filterSessionsByTimeline,
   filterSessionsByEvent,
 } from "@/lib/stats";
-import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { formatPercent } from "@/lib/formatters";
 import PageWrapper from "@/components/layout/PageWrapper";
 import StatCard from "@/components/dashboard/StatCard";
 import ProfitLineChart from "@/components/dashboard/ProfitLineChart";
@@ -163,7 +163,7 @@ export default async function DashboardPage({
         />
         <StatCard
           title="Total Profit"
-          value={formatCurrency(stats.totalProfit)}
+          currency={stats.totalProfit}
           trend={profitTrend}
         />
         <StatCard
@@ -173,17 +173,17 @@ export default async function DashboardPage({
         />
         <StatCard
           title="Avg / Session"
-          value={formatCurrency(stats.avgProfitPerSession)}
+          currency={stats.avgProfitPerSession}
           trend={stats.avgProfitPerSession >= 0 ? "up" : "down"}
         />
         <StatCard
           title="Biggest Win"
-          value={formatCurrency(stats.biggestWin)}
+          currency={stats.biggestWin}
           trend="up"
         />
         <StatCard
           title="Biggest Loss"
-          value={formatCurrency(Math.abs(stats.biggestLoss))}
+          currency={Math.abs(stats.biggestLoss)}
           trend="down"
         />
       </div>

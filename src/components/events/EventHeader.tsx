@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { getEventColor } from "./eventColors";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type { PokerEvent, SessionWithPlayers } from "@/types";
 
 interface EventHeaderProps {
@@ -15,6 +16,7 @@ interface EventHeaderProps {
 }
 
 export default function EventHeader({ event, sessions, onEdit, isCollapsed, onToggleCollapse }: EventHeaderProps) {
+  const { formatCurrency } = useFormatCurrency();
   const router = useRouter();
   const cols = getEventColor(event.color);
 

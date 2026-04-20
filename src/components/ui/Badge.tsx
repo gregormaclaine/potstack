@@ -1,5 +1,7 @@
+"use client";
+
 import { clsx } from "clsx";
-import { formatCurrency } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 
 interface BadgeProps {
   value: number;
@@ -12,6 +14,7 @@ export default function Badge({
   format = "currency",
   className,
 }: BadgeProps) {
+  const { formatCurrency } = useFormatCurrency();
   const label =
     format === "currency"
       ? (value > 0 ? "+" : "") + formatCurrency(value)

@@ -1,16 +1,27 @@
 import { format, parseISO } from "date-fns";
 
-export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-GB", {
+const CURRENCY_LOCALES: Record<string, string> = {
+  GBP: "en-GB",
+  USD: "en-US",
+  EUR: "de-DE",
+  JPY: "ja-JP",
+  CAD: "en-CA",
+  AUD: "en-AU",
+  CHF: "de-CH",
+};
+
+export function formatCurrency(value: number, currency = "GBP"): string {
+  const locale = CURRENCY_LOCALES[currency] ?? "en-GB";
+  return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "GBP",
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
 }
 
-export function formatProfit(value: number): string {
-  const formatted = formatCurrency(Math.abs(value));
+export function formatProfit(value: number, currency = "GBP"): string {
+  const formatted = formatCurrency(Math.abs(value), currency);
   if (value > 0) return `+${formatted}`;
   if (value < 0) return `-${formatted}`;
   return formatted;

@@ -12,8 +12,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { clsx } from "clsx";
-import { formatDate, formatCurrency } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
+import { useSettings, useFormatCurrency } from "@/contexts/SettingsContext";
 import type { ProfitOverTimePoint } from "@/types";
+
 
 interface ProfitLineChartProps {
   data: ProfitOverTimePoint[];
@@ -21,6 +23,8 @@ interface ProfitLineChartProps {
 
 export default function ProfitLineChart({ data }: ProfitLineChartProps) {
   const [dateScale, setDateScale] = useState(false);
+  const { curvedCharts } = useSettings();
+  const { formatCurrency } = useFormatCurrency();
 
   if (data.length === 0) {
     return (
@@ -99,7 +103,7 @@ export default function ProfitLineChart({ data }: ProfitLineChartProps) {
           />
           <ReferenceLine y={0} stroke="#52525b" strokeDasharray="4 2" />
           <Line
-            type="monotone"
+            type={curvedCharts ? "monotone" : "linear"}
             dataKey="cumulativeProfit"
             stroke="#10b981"
             strokeWidth={2}

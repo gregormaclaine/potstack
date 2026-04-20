@@ -10,13 +10,14 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { formatCurrency } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 
 interface AvgProfitChartProps {
   data: { name: string; avgProfit: number }[];
 }
 
 export default function AvgProfitChart({ data }: AvgProfitChartProps) {
+  const { formatCurrency } = useFormatCurrency();
   if (data.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-zinc-500">

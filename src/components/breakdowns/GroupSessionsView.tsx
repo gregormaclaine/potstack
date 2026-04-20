@@ -14,7 +14,8 @@ import {
   buildGroupSessionDetails,
   type GroupSessionPlayerRow,
 } from "@/lib/breakdowns";
-import { formatCurrency, formatPercent, formatDate } from "@/lib/formatters";
+import { formatPercent, formatDate } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type { SessionWithPlayers, PlayerGroup } from "@/types";
 
 type SortKey =
@@ -40,17 +41,19 @@ interface SavedGroupSearch {
   extraPlayerIds: number[];
 }
 
-function loadSavedSearches(userId: number): SavedGroupSearch[] {
-  try {
-    const raw = localStorage.getItem(`poker-tracker:group-searches:${userId}`);
-    return raw ? (JSON.parse(raw) as SavedGroupSearch[]) : [];
-  } catch {
-    return [];
-  }
+async function fetchSavedSearches(): Promise<SavedGroupSearch[]> {
+  const res = await fetch("/api/user/group-searches");
+  if (!res.ok) return [];
+  const data = (await res.json()) as { searches: SavedGroupSearch[] };
+  return data.searches;
 }
 
-function storeSavedSearches(userId: number, searches: SavedGroupSearch[]): void {
-  localStorage.setItem(`poker-tracker:group-searches:${userId}`, JSON.stringify(searches));
+function persistSavedSearches(searches: SavedGroupSearch[]): void {
+  void fetch("/api/user/group-searches", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ searches }),
+  });
 }
 
 interface GroupSessionsViewProps {
@@ -58,7 +61,6 @@ interface GroupSessionsViewProps {
   playerGroupMap: Record<number, number>;
   groups: PlayerGroup[];
   players: { id: number; name: string; groupId: number | null }[];
-  userId: number;
 }
 
 function SortHeader({
@@ -102,8 +104,8 @@ export default function GroupSessionsView({
   playerGroupMap,
   groups,
   players,
-  userId,
 }: GroupSessionsViewProps) {
+  const { formatCurrency } = useFormatCurrency();
   const router = useRouter();
   const searchParams = useSearchParams();
   const pendingHiddenKeysRef = useRef<string[] | null>(null);
@@ -215,10 +217,9 @@ export default function GroupSessionsView({
       });
   }, [tableRows, hiddenPlayerKeys, sortKey, sortDir]);
 
-  // Load saved searches from localStorage on mount
   useEffect(() => {
-    setSavedSearches(loadSavedSearches(userId));
-  }, [userId]);
+    void fetchSavedSearches().then(setSavedSearches);
+  }, []);
 
   // Reset hidden players and extra players when group changes, unless a saved search is being applied
   useEffect(() => {
@@ -293,7 +294,7 @@ export default function GroupSessionsView({
     };
     const updated = [...savedSearches, search];
     setSavedSearches(updated);
-    storeSavedSearches(userId, updated);
+    persistSavedSearches(updated);
     setSavingSearch(false);
     setSaveLabel("");
   }
@@ -301,7 +302,7 @@ export default function GroupSessionsView({
   function deleteSearch(id: string) {
     const updated = savedSearches.filter((s) => s.id !== id);
     setSavedSearches(updated);
-    storeSavedSearches(userId, updated);
+    persistSavedSearches(updated);
   }
 
   function applySearch(search: SavedGroupSearch) {

@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
-import { formatDate, formatCurrency } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type { SessionWithPlayers } from "@/types";
 
 interface SessionBreakdownTableProps {
@@ -8,6 +11,8 @@ interface SessionBreakdownTableProps {
 }
 
 export default function SessionBreakdownTable({ sessions }: SessionBreakdownTableProps) {
+  const { formatCurrency } = useFormatCurrency();
+
   if (sessions.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-zinc-500">No sessions yet.</p>

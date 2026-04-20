@@ -9,7 +9,8 @@ import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import { GROUP_COLORS } from "@/components/players/PlayerList";
 import { getSessionPredominantGroups, type SessionGroupLabel } from "@/lib/breakdowns";
-import { formatDate, formatCurrency } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type { SessionWithPlayers } from "@/types";
 
 function GroupChip({ group }: { group: SessionGroupLabel }) {
@@ -44,6 +45,7 @@ export default function SessionTable({
   page,
   totalPages,
 }: SessionTableProps) {
+  const { formatCurrency } = useFormatCurrency();
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);

@@ -7,7 +7,8 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import DeleteSessionButton from "./DeleteSessionButton";
 import SharePlayerButton from "@/components/sessions/SharePlayerButton";
-import { formatDate, formatCurrency } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
+import CurrencyValue from "@/components/ui/CurrencyValue";
 import { clsx } from "clsx";
 
 interface PageProps {
@@ -133,11 +134,11 @@ export default async function SessionDetailPage({ params }: PageProps) {
         <div className="flex items-center gap-6">
           <div>
             <p className="text-xs text-zinc-500">Buy-in</p>
-            <p className="text-sm font-semibold text-zinc-200">{formatCurrency(session.buyIn)}</p>
+            <p className="text-sm font-semibold text-zinc-200"><CurrencyValue value={session.buyIn} /></p>
           </div>
           <div>
             <p className="text-xs text-zinc-500">Cash-out</p>
-            <p className="text-sm font-semibold text-zinc-200">{formatCurrency(session.cashOut)}</p>
+            <p className="text-sm font-semibold text-zinc-200"><CurrencyValue value={session.cashOut} /></p>
           </div>
           <div className="ml-auto">
             <p className="text-xs text-zinc-500 text-right">Profit</p>
@@ -149,8 +150,7 @@ export default async function SessionDetailPage({ params }: PageProps) {
                 session.profit === 0 && "text-zinc-400"
               )}
             >
-              {session.profit > 0 ? "+" : ""}
-              {formatCurrency(session.profit)}
+              <CurrencyValue value={session.profit} sign />
             </p>
           </div>
         </div>
@@ -201,8 +201,8 @@ export default async function SessionDetailPage({ params }: PageProps) {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right text-sm text-zinc-400">{formatCurrency(sp.buyIn!)}</td>
-                      <td className="px-4 py-3 text-right text-sm text-zinc-400">{formatCurrency(sp.cashOut!)}</td>
+                      <td className="px-4 py-3 text-right text-sm text-zinc-400"><CurrencyValue value={sp.buyIn!} /></td>
+                      <td className="px-4 py-3 text-right text-sm text-zinc-400"><CurrencyValue value={sp.cashOut!} /></td>
                       <td className="px-4 py-3 text-right"><Badge value={sp.profit!} /></td>
                     </tr>
                   );

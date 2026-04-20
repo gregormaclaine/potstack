@@ -10,7 +10,8 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
+import { useSettings, useFormatCurrency } from "@/contexts/SettingsContext";
 import type { CumulativePlayerPoint, CumulativePlayerMeta } from "@/types";
 
 interface CumulativeProfitByPlayerChartProps {
@@ -22,6 +23,8 @@ export default function CumulativeProfitByPlayerChart({
   points,
   players,
 }: CumulativeProfitByPlayerChartProps) {
+  const { curvedCharts } = useSettings();
+  const { formatCurrency } = useFormatCurrency();
   if (points.length === 0 || players.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-zinc-500">
@@ -71,7 +74,7 @@ export default function CumulativeProfitByPlayerChart({
         {players.map((p) => (
           <Line
             key={p.key}
-            type="monotone"
+            type={curvedCharts ? "monotone" : "linear"}
             dataKey={p.key}
             stroke={p.color}
             strokeWidth={p.key === "me" ? 2.5 : 1.5}

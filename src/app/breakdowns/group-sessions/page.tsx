@@ -40,7 +40,6 @@ export default async function GroupSessionsPage() {
         playerGroupMap={playerGroupMap}
         groups={rawGroups}
         players={players}
-        userId={userId}
       />
     </PageWrapper>
   );

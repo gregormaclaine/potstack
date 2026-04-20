@@ -19,6 +19,9 @@ model User {
   avatar                     String?
   createdAt                  DateTime        @default(now())
   breakdownLastRefreshedAt   DateTime?
+  settingsCurvedCharts       Boolean         @default(true)
+  settingsCurrency           String          @default("GBP")
+  groupSearches              Json            @default("[]")
   sessions                   Session[]
   players                    Player[]
   playerGroups               PlayerGroup[]

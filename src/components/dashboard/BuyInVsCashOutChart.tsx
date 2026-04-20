@@ -10,7 +10,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { formatDate, formatCurrency } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type { SessionWithPlayers } from "@/types";
 
 interface BuyInVsCashOutChartProps {
@@ -18,6 +19,7 @@ interface BuyInVsCashOutChartProps {
 }
 
 export default function BuyInVsCashOutChart({ sessions }: BuyInVsCashOutChartProps) {
+  const { formatCurrency } = useFormatCurrency();
   if (sessions.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-zinc-500">
