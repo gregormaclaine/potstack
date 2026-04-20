@@ -185,6 +185,13 @@ export default function BreakdownsView({
           </div>
         </div>
         <div className="flex items-center gap-3 sm:justify-end">
+          <Link
+            href="/breakdowns/group-sessions"
+            className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200"
+          >
+            Group Sessions
+            <span className="text-zinc-600">→</span>
+          </Link>
           {statsEnabled && (
             <Link
               href="/breakdowns/stats"

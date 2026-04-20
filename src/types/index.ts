@@ -206,6 +206,27 @@ export type NotificationData =
   | ({ type: "session_invite_rejected" }       & SessionInviteRejectedData)
   | ({ type: "session_invite_rejected_by_me" } & SessionInviteRejectedByMeData);
 
+export interface CumulativePlayerPoint {
+  sessionIndex: number;
+  date: string;
+  [playerKey: string]: number | string; // "me" or "player_{id}" keys
+}
+
+export interface CumulativePlayerMeta {
+  key: string;    // "me" or "player_42"
+  name: string;   // display name
+  color: string;  // hex color e.g. "#10b981"
+}
+
+export interface GroupSessionDetail {
+  sessionId: number;
+  date: string;
+  totalPlayers: number;    // all players including user
+  nonGroupPlayers: number; // opponents NOT in the selected group
+  totalOnTable: number;    // sum of all known buy-ins (user + non-null opponent buy-ins)
+  groupNet: number;        // sum of user profit + known group-member opponent profits
+}
+
 export interface DuplicateSessionInfo {
   sessionId: number;
   myBuyIn: number;

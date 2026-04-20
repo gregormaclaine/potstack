@@ -4,7 +4,22 @@ import type {
   PlayerBreakdownRow,
   GroupBreakdownRow,
   PlayerGroup,
+  CumulativePlayerPoint,
+  CumulativePlayerMeta,
+  GroupSessionDetail,
 } from "@/types";
+
+const PLAYER_LINE_COLORS: string[] = [
+  "#10b981", // emerald — always "You"
+  "#38bdf8", // sky
+  "#a78bfa", // violet
+  "#fbbf24", // amber
+  "#fb7185", // rose
+  "#22d3ee", // cyan
+  "#fb923c", // orange
+  "#84cc16", // lime
+  "#e879f9", // fuchsia
+];
 
 interface PlayerMeta {
   name: string;
@@ -172,6 +187,229 @@ export function buildPlayerBreakdowns(
   }
 
   return rows.sort((a, b) => b.sessions - a.sessions);
+}
+
+/**
+ * Returns all sessions where any opponent belongs to the given group.
+ * Used by the Group Sessions Explorer (as opposed to the ≥50% majority rule).
+ */
+export function getSessionsForGroup(
+  sessions: SessionWithPlayers[],
+  groupId: number,
+  playerGroupMap: Map<number, number>,
+): SessionWithPlayers[] {
+  return sessions.filter((s) =>
+    s.players.some((sp) => playerGroupMap.get(sp.playerId) === groupId)
+  );
+}
+
+export interface GroupSessionPlayerRow {
+  key: string;
+  name: string;
+  isMe: boolean;
+  sessions: number;
+  totalBuyIn: number | null;
+  totalCashOut: number | null;
+  profit: number | null;
+  avgProfit: number | null;
+  maxProfit: number | null;
+  maxLoss: number | null;
+  winRate: number | null;
+}
+
+/**
+ * Builds per-player breakdown rows for the Group Sessions Explorer.
+ * Only includes opponents who belong to groupId. Includes a "You" row for the logged-in user.
+ * Opponent numeric fields are null when no data has been recorded.
+ */
+export function buildGroupSessionPlayerRows(
+  filteredSessions: SessionWithPlayers[],
+  groupId: number,
+  playerGroupMap: Map<number, number>,
+  extraPlayerIds: Set<number> = new Set(),
+): GroupSessionPlayerRow[] {
+  // "You" row — always has complete data
+  const youRow: GroupSessionPlayerRow = {
+    key: "me",
+    name: "You",
+    isMe: true,
+    sessions: filteredSessions.length,
+    totalBuyIn: filteredSessions.reduce((s, r) => s + r.buyIn, 0),
+    totalCashOut: filteredSessions.reduce((s, r) => s + r.cashOut, 0),
+    profit: filteredSessions.reduce((s, r) => s + r.profit, 0),
+    avgProfit: filteredSessions.length > 0
+      ? filteredSessions.reduce((s, r) => s + r.profit, 0) / filteredSessions.length
+      : 0,
+    maxProfit: filteredSessions.length > 0 ? Math.max(...filteredSessions.map((r) => r.profit)) : 0,
+    maxLoss: filteredSessions.length > 0 ? Math.min(...filteredSessions.map((r) => r.profit)) : 0,
+    winRate: filteredSessions.length > 0
+      ? (filteredSessions.filter((r) => r.profit > 0).length / filteredSessions.length) * 100
+      : 0,
+  };
+
+  // Opponent rows
+  const opponentMap = new Map<number, {
+    name: string;
+    appearances: number;
+    buyIns: number[];
+    cashOuts: number[];
+    profits: number[];
+  }>();
+
+  for (const session of filteredSessions) {
+    for (const sp of session.players) {
+      if (playerGroupMap.get(sp.playerId) !== groupId && !extraPlayerIds.has(sp.playerId)) continue;
+      const existing = opponentMap.get(sp.playerId);
+      if (existing) {
+        existing.appearances++;
+        if (sp.buyIn !== null) existing.buyIns.push(sp.buyIn);
+        if (sp.cashOut !== null) existing.cashOuts.push(sp.cashOut);
+        if (sp.profit !== null) existing.profits.push(sp.profit);
+      } else {
+        opponentMap.set(sp.playerId, {
+          name: sp.playerName,
+          appearances: 1,
+          buyIns: sp.buyIn !== null ? [sp.buyIn] : [],
+          cashOuts: sp.cashOut !== null ? [sp.cashOut] : [],
+          profits: sp.profit !== null ? [sp.profit] : [],
+        });
+      }
+    }
+  }
+
+  const opponentRows: GroupSessionPlayerRow[] = [];
+  for (const [playerId, data] of opponentMap.entries()) {
+    const { profits } = data;
+    opponentRows.push({
+      key: `player_${playerId}`,
+      name: data.name,
+      isMe: false,
+      sessions: data.appearances,
+      totalBuyIn: data.buyIns.length > 0 ? data.buyIns.reduce((s, v) => s + v, 0) : null,
+      totalCashOut: data.cashOuts.length > 0 ? data.cashOuts.reduce((s, v) => s + v, 0) : null,
+      profit: profits.length > 0 ? profits.reduce((s, v) => s + v, 0) : null,
+      avgProfit: profits.length > 0 ? profits.reduce((s, v) => s + v, 0) / profits.length : null,
+      maxProfit: profits.length > 0 ? Math.max(...profits) : null,
+      maxLoss: profits.length > 0 ? Math.min(...profits) : null,
+      winRate: profits.length > 0 ? (profits.filter((p) => p > 0).length / profits.length) * 100 : null,
+    });
+  }
+
+  opponentRows.sort((a, b) => b.sessions - a.sessions);
+  return [youRow, ...opponentRows];
+}
+
+/**
+ * Builds cumulative profit over time per player for the Group Sessions Explorer chart.
+ * Only includes opponents who belong to groupId. Returns chart data points (one per session)
+ * and player metadata for rendering lines.
+ */
+export function buildCumulativeByPlayer(
+  filteredSessions: SessionWithPlayers[],
+  groupId: number,
+  playerGroupMap: Map<number, number>,
+  extraPlayerIds: Set<number> = new Set(),
+): {
+  points: CumulativePlayerPoint[];
+  players: CumulativePlayerMeta[];
+} {
+  if (filteredSessions.length === 0) return { points: [], players: [] };
+
+  // Collect group-member player keys in first-appearance order
+  const allKeys: string[] = ["me"];
+  const nameMap = new Map<string, string>([["me", "You"]]);
+
+  for (const session of filteredSessions) {
+    for (const sp of session.players) {
+      if (playerGroupMap.get(sp.playerId) !== groupId && !extraPlayerIds.has(sp.playerId)) continue;
+      const key = `player_${sp.playerId}`;
+      if (!nameMap.has(key)) {
+        allKeys.push(key);
+        nameMap.set(key, sp.playerName);
+      }
+    }
+  }
+
+  // Assign colors — "me" always gets PLAYER_LINE_COLORS[0]
+  const colorMap = new Map<string, string>();
+  for (let i = 0; i < allKeys.length; i++) {
+    colorMap.set(allKeys[i], PLAYER_LINE_COLORS[i % PLAYER_LINE_COLORS.length]);
+  }
+
+  // Build cumulative points
+  const cumulative = new Map<string, number>(allKeys.map((k) => [k, 0]));
+  const points: CumulativePlayerPoint[] = [];
+
+  for (let i = 0; i < filteredSessions.length; i++) {
+    const session = filteredSessions[i];
+
+    // Update "me"
+    cumulative.set("me", (cumulative.get("me") ?? 0) + session.profit);
+
+    // Update each opponent key (carry-forward if absent or null)
+    for (const key of allKeys) {
+      if (key === "me") continue;
+      const playerId = Number(key.replace("player_", ""));
+      const sp = session.players.find((p) => p.playerId === playerId);
+      if (sp && sp.profit !== null) {
+        cumulative.set(key, (cumulative.get(key) ?? 0) + sp.profit);
+      }
+      // else: carry forward — value unchanged
+    }
+
+    const point: CumulativePlayerPoint = { sessionIndex: i + 1, date: session.date };
+    for (const key of allKeys) {
+      point[key] = cumulative.get(key) ?? 0;
+    }
+    points.push(point);
+  }
+
+  const players: CumulativePlayerMeta[] = allKeys.map((key) => ({
+    key,
+    name: nameMap.get(key) ?? key,
+    color: colorMap.get(key) ?? "#71717a",
+  }));
+
+  return { points, players };
+}
+
+/**
+ * Builds per-session detail rows for the Group Sessions Explorer side table.
+ */
+export function buildGroupSessionDetails(
+  filteredSessions: SessionWithPlayers[],
+  groupId: number,
+  playerGroupMap: Map<number, number>,
+  extraPlayerIds: Set<number> = new Set(),
+): GroupSessionDetail[] {
+  return filteredSessions.map((session) => {
+    const isGroupMember = (playerId: number) =>
+      playerGroupMap.get(playerId) === groupId || extraPlayerIds.has(playerId);
+
+    const nonGroupPlayers = session.players.filter(
+      (sp) => !isGroupMember(sp.playerId)
+    ).length;
+
+    const totalOnTable =
+      session.buyIn +
+      session.players.reduce((sum, sp) => sum + (sp.buyIn ?? 0), 0);
+
+    const groupNetRaw =
+      session.profit +
+      session.players
+        .filter((sp) => isGroupMember(sp.playerId) && sp.profit !== null)
+        .reduce((sum, sp) => sum + (sp.profit ?? 0), 0);
+    const groupNet = Math.round(groupNetRaw * 100) / 100;
+
+    return {
+      sessionId: session.id,
+      date: session.date,
+      totalPlayers: session.players.length + 1,
+      nonGroupPlayers,
+      totalOnTable,
+      groupNet,
+    };
+  });
 }
 
 /**
