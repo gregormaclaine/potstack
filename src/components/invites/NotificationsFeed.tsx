@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, KeyboardEvent } from "react";
+import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import Link from "next/link";
 import { clsx } from "clsx";
 import Button from "@/components/ui/Button";
@@ -15,6 +15,7 @@ import type {
   ResolvedPlayer,
   UnresolvedPlayer,
   PlayerMapping,
+  DuplicateSessionInfo,
 } from "@/types";
 
 // ── Player combobox ───────────────────────────────────────────────────────────
@@ -157,9 +158,13 @@ function SessionLink({ sessionId, date }: { sessionId: number | null; date: stri
 
 type InviteAcceptPhase =
   | { phase: "idle" }
-  | { phase: "resolving" }
-  | { phase: "mapping"; resolved: ResolvedPlayer[]; unresolved: UnresolvedPlayer[]; mappings: Record<number, ComboboxPlayer | null> }
+  | { phase: "resolving"; isOverwrite: boolean; existingSessionId?: number }
+  | { phase: "mapping"; resolved: ResolvedPlayer[]; unresolved: UnresolvedPlayer[]; mappings: Record<number, ComboboxPlayer | null>; isOverwrite: boolean; existingSessionId?: number }
   | { phase: "submitting" };
+
+type DuplicateCheckState =
+  | { status: "checking" }
+  | { status: "done"; result: DuplicateSessionInfo | null };
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -173,7 +178,7 @@ interface NotificationsFeedProps {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function NotificationsFeed({ notifications, myPlayers }: NotificationsFeedProps) {
-  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [loadingAction, setLoadingAction] = useState<{ notifId: number; button: string } | null>(null);
 
   // Link accept flow
   const [acceptingLinkNotifId, setAcceptingLinkNotifId] = useState<number | null>(null);
@@ -184,8 +189,34 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
   const [inviteAcceptStates, setInviteAcceptStates] = useState<Record<number, InviteAcceptPhase>>({});
   const [inviteError, setInviteError] = useState<Record<number, string>>({});
 
+  // Duplicate session check results (per notification id), populated client-side on mount
+  const [duplicateChecks, setDuplicateChecks] = useState<Record<number, DuplicateCheckState>>({});
+
   // Optimistic notification list (allows removing/replacing in-place)
   const [notifList, setNotifList] = useState<NotificationRow[]>(notifications);
+
+  useEffect(() => {
+    const pending = notifications.filter(
+      (n) => n.type === "session_invite_received" && n.invite?.status === "PENDING" && n.inviteId !== null
+    );
+    if (pending.length === 0) return;
+
+    setDuplicateChecks(
+      Object.fromEntries(pending.map((n) => [n.id, { status: "checking" } as DuplicateCheckState]))
+    );
+
+    for (const n of pending) {
+      fetch(`/api/invites/${n.inviteId}/duplicate`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((result: DuplicateSessionInfo | null) => {
+          setDuplicateChecks((prev) => ({ ...prev, [n.id]: { status: "done", result } }));
+        })
+        .catch(() => {
+          setDuplicateChecks((prev) => ({ ...prev, [n.id]: { status: "done", result: null } }));
+        });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function replaceNotif(id: number, replacement: NotificationRow | null) {
     setNotifList((prev) =>
@@ -208,7 +239,7 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
     setPickError("");
     if (!selectedPlayer) { setPickError("Please select or create a player."); return; }
 
-    setLoadingId(notifId);
+    setLoadingAction({ notifId, button: "confirm" });
     try {
       const isCreating = selectedPlayer.id === -1;
       const body: Record<string, unknown> = { action: "accept" };
@@ -232,12 +263,12 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
       });
       setAcceptingLinkNotifId(null);
     } finally {
-      setLoadingId(null);
+      setLoadingAction(null);
     }
   }
 
   async function rejectLink(notifId: number, linkId: number, data: LinkRequestReceivedData) {
-    setLoadingId(notifId);
+    setLoadingAction({ notifId, button: "reject" });
     try {
       const res = await fetch(`/api/links/${linkId}`, {
         method: "PATCH",
@@ -253,14 +284,14 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
         link: { status: "REJECTED" },
       });
     } finally {
-      setLoadingId(null);
+      setLoadingAction(null);
     }
   }
 
   // ── Invite accept ──────────────────────────────────────────────────────────
 
-  async function startInviteAccept(notifId: number, inviteId: number) {
-    setInvitePhase(notifId, { phase: "resolving" });
+  async function startInviteAccept(notifId: number, inviteId: number, isOverwrite: boolean, existingSessionId?: number, button = "accept") {
+    setInvitePhase(notifId, { phase: "resolving", isOverwrite, existingSessionId });
     setInviteError((prev) => ({ ...prev, [notifId]: "" }));
 
     try {
@@ -269,9 +300,9 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
       const data: { resolved: ResolvedPlayer[]; unresolved: UnresolvedPlayer[] } = await res.json();
 
       if (data.unresolved.length === 0) {
-        await submitInviteAccept(notifId, inviteId, data.resolved, []);
+        await submitInviteAccept(notifId, inviteId, data.resolved, [], isOverwrite, existingSessionId, button);
       } else {
-        setInvitePhase(notifId, { phase: "mapping", resolved: data.resolved, unresolved: data.unresolved, mappings: {} });
+        setInvitePhase(notifId, { phase: "mapping", resolved: data.resolved, unresolved: data.unresolved, mappings: {}, isOverwrite, existingSessionId });
       }
     } catch {
       setInvitePhase(notifId, { phase: "idle" });
@@ -282,7 +313,9 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
     notifId: number,
     inviteId: number,
     _resolved: ResolvedPlayer[],
-    unresolvedMappings: Array<{ fromPlayerId: number; player: ComboboxPlayer | null }>
+    unresolvedMappings: Array<{ fromPlayerId: number; player: ComboboxPlayer | null }>,
+    isOverwrite = false,
+    existingSessionId?: number,
   ) {
     setInvitePhase(notifId, { phase: "submitting" });
     setLoadingId(notifId);
@@ -295,11 +328,15 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
         return { fromPlayerId: m.fromPlayerId, toPlayerId: p.id };
       });
 
+    const action = isOverwrite ? "overwrite" : "accept";
+    const body: { action: string; playerMappings: PlayerMapping[]; existingSessionId?: number } = { action, playerMappings };
+    if (isOverwrite && existingSessionId !== undefined) body.existingSessionId = existingSessionId;
+
     try {
       const res = await fetch(`/api/invites/${inviteId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "accept", playerMappings }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -406,7 +443,10 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
               myPlayers={myPlayers}
               error={err}
               createdAt={createdAt}
-              onStartAccept={() => { if (notif.inviteId !== null) startInviteAccept(id, notif.inviteId!); }}
+              duplicateCheck={duplicateChecks[id]}
+              onStartAccept={(isOverwrite, existingSessionId) => {
+                if (notif.inviteId !== null) startInviteAccept(id, notif.inviteId!, isOverwrite, existingSessionId);
+              }}
               onReject={() => { if (notif.inviteId !== null) rejectInvite(id, notif.inviteId!); }}
               onMappingChange={(fromPlayerId, player) => {
                 setInviteAcceptStates((prev) => {
@@ -418,8 +458,10 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
               onCancelMapping={() => setInvitePhase(id, { phase: "idle" })}
               onSubmitMapping={() => {
                 if (invitePhase.phase !== "mapping") return;
-                submitInviteAccept(id, notif.inviteId!, invitePhase.resolved,
-                  invitePhase.unresolved.map((u) => ({ fromPlayerId: u.fromPlayerId, player: invitePhase.mappings[u.fromPlayerId] ?? null }))
+                submitInviteAccept(
+                  id, notif.inviteId!, invitePhase.resolved,
+                  invitePhase.unresolved.map((u) => ({ fromPlayerId: u.fromPlayerId, player: invitePhase.mappings[u.fromPlayerId] ?? null })),
+                  invitePhase.isOverwrite, invitePhase.existingSessionId,
                 );
               }}
             />
@@ -587,6 +629,7 @@ function SessionInviteReceivedCard({
   myPlayers,
   error,
   createdAt,
+  duplicateCheck,
   onStartAccept,
   onReject,
   onMappingChange,
@@ -602,7 +645,8 @@ function SessionInviteReceivedCard({
   myPlayers: { id: number; name: string }[];
   error: string | undefined;
   createdAt: string;
-  onStartAccept: () => void;
+  duplicateCheck: DuplicateCheckState | undefined;
+  onStartAccept: (isOverwrite: boolean, existingSessionId?: number) => void;
   onReject: () => void;
   onMappingChange: (fromPlayerId: number, player: ComboboxPlayer | null) => void;
   onCancelMapping: () => void;
@@ -611,6 +655,7 @@ function SessionInviteReceivedCard({
   const [viewOpen, setViewOpen] = useState(false);
   const [viewData, setViewData] = useState<InviteSessionDetail | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
+  const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false);
 
   async function openView() {
     setViewOpen(true);
@@ -621,6 +666,20 @@ function SessionInviteReceivedCard({
       if (res.ok) setViewData(await res.json());
     } finally {
       setViewLoading(false);
+    }
+  }
+
+  const dupResult = duplicateCheck?.status === "done" ? duplicateCheck.result : null;
+
+  function handleOverwriteClick() {
+    if (!dupResult) return;
+    const financialsDiffer =
+      d.buyIn !== dupResult.myBuyIn ||
+      d.cashOut !== dupResult.myCashOut;
+    if (financialsDiffer) {
+      setOverwriteConfirmOpen(true);
+    } else {
+      onStartAccept(true, dupResult.sessionId);
     }
   }
 
@@ -647,16 +706,50 @@ function SessionInviteReceivedCard({
       </div>
 
       {invitePending && invitePhase.phase === "idle" && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-4 text-sm">
-            {d.buyIn != null && <span className="text-zinc-400"><span className="mr-1 text-xs text-zinc-600">Buy-in</span>{formatCurrency(d.buyIn)}</span>}
-            {d.cashOut != null && <span className="text-zinc-400"><span className="mr-1 text-xs text-zinc-600">Cash-out</span>{formatCurrency(d.cashOut)}</span>}
-            {d.profit != null && <Badge value={d.profit} />}
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-4 text-sm">
+              {d.buyIn != null && <span className="text-zinc-400"><span className="mr-1 text-xs text-zinc-600">Buy-in</span>{formatCurrency(d.buyIn)}</span>}
+              {d.cashOut != null && <span className="text-zinc-400"><span className="mr-1 text-xs text-zinc-600">Cash-out</span>{formatCurrency(d.cashOut)}</span>}
+              {d.profit != null && <Badge value={d.profit} />}
+            </div>
+            <div className="flex gap-2">
+              {(!duplicateCheck || duplicateCheck.status === "checking") ? (
+                <>
+                  <Button size="sm" variant="ghost" loading={isLoading} onClick={onReject}>Reject</Button>
+                  <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+                    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-400" />
+                    Checking…
+                  </span>
+                </>
+              ) : dupResult === null ? (
+                <>
+                  <Button size="sm" variant="ghost" loading={isLoading} onClick={onReject}>Reject</Button>
+                  <Button size="sm" loading={isLoading} onClick={() => onStartAccept(false)}>Accept</Button>
+                </>
+              ) : null}
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="ghost" loading={isLoading} onClick={onReject}>Reject</Button>
-            <Button size="sm" loading={isLoading} onClick={onStartAccept}>Accept</Button>
-          </div>
+
+          {dupResult !== null && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-zinc-400">
+                Found matching session:{" "}
+                <Link href={`/sessions/${dupResult.sessionId}`} className="text-zinc-200 underline underline-offset-2 hover:text-white">
+                  {formatDate(d.sessionDate)}
+                </Link>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="ghost" loading={isLoading} onClick={onReject}>Reject</Button>
+                <Button size="sm" variant="ghost" loading={isLoading} onClick={() => onStartAccept(false)}>
+                  Save as new
+                </Button>
+                <Button size="sm" loading={isLoading} onClick={handleOverwriteClick}>
+                  Update existing
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -681,6 +774,54 @@ function SessionInviteReceivedCard({
       )}
 
       {!invitePending && d.profit != null && <Badge value={d.profit} />}
+
+      <Modal
+        open={overwriteConfirmOpen}
+        onClose={() => setOverwriteConfirmOpen(false)}
+        title="Update existing session?"
+      >
+        {dupResult && (
+          <div className="space-y-4">
+            <p className="text-sm text-zinc-400">
+              Your recorded figures differ from{" "}
+              <span className="font-medium text-zinc-200">@{d.inviterUsername}</span>&apos;s.
+              Updating will apply their figures to your existing session.
+            </p>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs uppercase text-zinc-600">
+                  <th className="pb-1.5 text-left font-medium"></th>
+                  <th className="pb-1.5 text-right font-medium">Your record</th>
+                  <th className="pb-1.5 text-right font-medium">Their record</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                <tr>
+                  <td className="py-1.5 text-zinc-500">Buy-in</td>
+                  <td className={clsx("py-1.5 text-right", dupResult.myBuyIn !== d.buyIn && "text-amber-300")}>{formatCurrency(dupResult.myBuyIn)}</td>
+                  <td className={clsx("py-1.5 text-right", dupResult.myBuyIn !== d.buyIn ? "text-amber-300 font-medium" : "text-zinc-300")}>{d.buyIn != null ? formatCurrency(d.buyIn) : "—"}</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 text-zinc-500">Cash-out</td>
+                  <td className={clsx("py-1.5 text-right", dupResult.myCashOut !== d.cashOut && "text-amber-300")}>{formatCurrency(dupResult.myCashOut)}</td>
+                  <td className={clsx("py-1.5 text-right", dupResult.myCashOut !== d.cashOut ? "text-amber-300 font-medium" : "text-zinc-300")}>{d.cashOut != null ? formatCurrency(d.cashOut) : "—"}</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 text-zinc-500">Profit</td>
+                  <td className="py-1.5 text-right"><Badge value={dupResult.myProfit} /></td>
+                  <td className="py-1.5 text-right">{d.profit != null ? <Badge value={d.profit} /> : "—"}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setOverwriteConfirmOpen(false)}>Cancel</Button>
+              <Button size="sm" onClick={() => { setOverwriteConfirmOpen(false); onStartAccept(true, dupResult.sessionId); }}>
+                Yes, update
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         open={viewOpen}

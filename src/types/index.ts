@@ -203,6 +203,13 @@ export type NotificationData =
   | ({ type: "session_invite_rejected" }       & SessionInviteRejectedData)
   | ({ type: "session_invite_rejected_by_me" } & SessionInviteRejectedByMeData);
 
+export interface DuplicateSessionInfo {
+  sessionId: number;
+  myBuyIn: number;
+  myCashOut: number;
+  myProfit: number;
+}
+
 /** A fully-fetched notification row ready for the frontend. */
 export interface NotificationRow {
   id: number;

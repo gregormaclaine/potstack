@@ -87,7 +87,7 @@ export async function PATCH(
   const userId = Number(session.user.id);
 
   const { id } = await params;
-  const body: { action: "accept" | "reject"; playerMappings?: PlayerMapping[] } =
+  const body: { action: "accept" | "reject" | "overwrite"; playerMappings?: PlayerMapping[]; existingSessionId?: number } =
     await request.json();
 
   const invite = await prisma.sessionInvite.findUnique({
@@ -138,7 +138,24 @@ export async function PATCH(
     return NextResponse.json({ success: true });
   }
 
-  // Accept: create a new session in the invitee's account
+  // Validate update target before doing any work
+  if (body.action === "overwrite") {
+    if (!body.existingSessionId) {
+      return NextResponse.json({ error: "existingSessionId is required for overwrite" }, { status: 400 });
+    }
+    const existing = await prisma.session.findUnique({
+      where: { id: body.existingSessionId },
+      select: { userId: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Existing session not found" }, { status: 404 });
+    }
+    if (existing.userId !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
+  // Accept / overwrite: build player mappings and financials
   const src = invite.session;
   const sp = invite.sessionPlayer;
   const link = invite.link;
@@ -211,8 +228,73 @@ export async function PATCH(
     allMappings.set(m.fromPlayerId, m.toPlayerId);
   }
 
+  const sessionDate          = invite.session.date.toISOString();
+  const sessionLocation      = invite.session.location;
+  const sessionOwnerUsername = invite.session.user.username;
+  const inviteeUsername      = invite.invitee.username;
+
+  // ── Overwrite: update financials + upsert players into the existing session ──
+  if (body.action === "overwrite") {
+    const existingSessionId = body.existingSessionId!;
+
+    await prisma.$transaction(async (tx) => {
+      // Update only the invitee's own financials; preserve location, notes, date, etc.
+      await tx.session.update({
+        where: { id: existingSessionId },
+        data: { buyIn: myBuyIn, cashOut: myCashOut, profit: myProfit, sourceInviteId: Number(id) },
+      });
+
+      // Upsert other mapped players
+      for (const [fromPlayerId, toPlayerId] of allMappings) {
+        const orig = originalPlayerMap.get(fromPlayerId);
+        await tx.sessionPlayer.upsert({
+          where: { sessionId_playerId: { sessionId: existingSessionId, playerId: toPlayerId } },
+          create: { sessionId: existingSessionId, playerId: toPlayerId, buyIn: orig?.buyIn ?? null, cashOut: orig?.cashOut ?? null, profit: orig?.profit ?? null },
+          update: { buyIn: orig?.buyIn ?? null, cashOut: orig?.cashOut ?? null, profit: orig?.profit ?? null },
+        });
+      }
+
+      // Upsert the inviter's player
+      if (targetPlayerId) {
+        await tx.sessionPlayer.upsert({
+          where: { sessionId_playerId: { sessionId: existingSessionId, playerId: targetPlayerId } },
+          create: { sessionId: existingSessionId, playerId: targetPlayerId, buyIn: src.buyIn, cashOut: src.cashOut, profit: src.profit },
+          update: { buyIn: src.buyIn, cashOut: src.cashOut, profit: src.profit },
+        });
+      }
+
+      await tx.sessionInvite.update({
+        where: { id: Number(id) },
+        data: { status: "ACCEPTED" },
+      });
+
+      if (manualMappings.length > 0) {
+        await tx.playerEquivalence.createMany({
+          data: manualMappings.map((m) => ({ fromPlayerId: m.fromPlayerId, toPlayerId: m.toPlayerId, linkId })),
+          skipDuplicates: true,
+        });
+      }
+    });
+
+    await Promise.all([
+      deleteSessionInviteReceivedNotification(invite.id, userId),
+      createNotification({
+        userId,
+        sessionId: existingSessionId,
+        data: { type: "session_invite_accepted_by_me", otherUsername: sessionOwnerUsername, sessionDate, sessionLocation },
+      }),
+      createNotification({
+        userId: invite.session.userId,
+        sessionId: invite.sessionId,
+        data: { type: "session_invite_accepted", otherUsername: inviteeUsername, sessionDate, sessionLocation },
+      }),
+    ]);
+
+    return NextResponse.json({ sessionId: existingSessionId });
+  }
+
+  // ── Accept: create a new session in the invitee's account ────────────────────
   const newSession = await prisma.$transaction(async (tx) => {
-    // Build additional SessionPlayer create data
     const additionalPlayers: Array<{ playerId: number; buyIn: number | null; cashOut: number | null; profit: number | null }> = [];
     for (const [fromPlayerId, toPlayerId] of allMappings) {
       const orig = originalPlayerMap.get(fromPlayerId);
@@ -224,7 +306,6 @@ export async function PATCH(
       });
     }
 
-    // Add the link's linkedPlayer (representing the session owner) if present
     if (targetPlayerId) {
       additionalPlayers.push({
         playerId: targetPlayerId,
@@ -243,6 +324,7 @@ export async function PATCH(
         cashOut: myCashOut,
         profit: myProfit,
         userId,
+        sourceInviteId: Number(id),
         players: additionalPlayers.length > 0 ? { create: additionalPlayers } : undefined,
       },
     });
@@ -252,15 +334,9 @@ export async function PATCH(
       data: { status: "ACCEPTED" },
     });
 
-    // Save PlayerEquivalences for manual mappings (not auto-resolved via link graph,
-    // as those will always be resolvable through the graph)
     if (manualMappings.length > 0) {
       await tx.playerEquivalence.createMany({
-        data: manualMappings.map((m) => ({
-          fromPlayerId: m.fromPlayerId,
-          toPlayerId: m.toPlayerId,
-          linkId,
-        })),
+        data: manualMappings.map((m) => ({ fromPlayerId: m.fromPlayerId, toPlayerId: m.toPlayerId, linkId })),
         skipDuplicates: true,
       });
     }
@@ -268,23 +344,16 @@ export async function PATCH(
     return created;
   });
 
-  const sessionDate         = invite.session.date.toISOString();
-  const sessionLocation     = invite.session.location;
-  const sessionOwnerUsername = invite.session.user.username;
-  const inviteeUsername     = invite.invitee.username;
-
   await Promise.all([
     deleteSessionInviteReceivedNotification(invite.id, userId),
-    // Invitee: "You accepted @owner's session"
     createNotification({
       userId,
-      sessionId: newSession.id, // their new copy of the session
+      sessionId: newSession.id,
       data: { type: "session_invite_accepted_by_me", otherUsername: sessionOwnerUsername, sessionDate, sessionLocation },
     }),
-    // Session owner: "@invitee accepted your session"
     createNotification({
       userId: invite.session.userId,
-      sessionId: invite.sessionId, // the original session
+      sessionId: invite.sessionId,
       data: { type: "session_invite_accepted", otherUsername: inviteeUsername, sessionDate, sessionLocation },
     }),
   ]);

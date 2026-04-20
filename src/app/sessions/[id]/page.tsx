@@ -33,6 +33,24 @@ export default async function SessionDetailPage({ params }: PageProps) {
 
   if (!session) notFound();
 
+  // Determine the inviter's playerId in this session (to suppress share button)
+  let inviterPlayerId: number | null = null;
+  let inviterUsername: string | null = null;
+  if (session.sourceInviteId) {
+    const sourceInvite = await prisma.sessionInvite.findUnique({
+      where: { id: session.sourceInviteId },
+      select: {
+        link: { select: { ownerUserId: true, ownerPlayerId: true, linkedPlayerId: true } },
+        session: { select: { user: { select: { username: true } } } },
+      },
+    });
+    if (sourceInvite) {
+      inviterUsername = sourceInvite.session.user.username;
+      const inviteeIsOwner = userId === sourceInvite.link.ownerUserId;
+      inviterPlayerId = inviteeIsOwner ? sourceInvite.link.ownerPlayerId : (sourceInvite.link.linkedPlayerId ?? null);
+    }
+  }
+
   // Fetch session invites and build a lookup by sessionPlayerId
   const sessionInvites = await prisma.sessionInvite.findMany({
     where: { sessionId: Number(id) },
@@ -91,6 +109,15 @@ export default async function SessionDetailPage({ params }: PageProps) {
           <DeleteSessionButton sessionId={session.id} />
         </div>
       </div>
+
+      {inviterUsername && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-blue-900 bg-blue-950/40 px-4 py-2.5 text-sm text-blue-300">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
+            <path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4 19-7z" />
+          </svg>
+          <span>Shared by <span className="font-semibold">@{inviterUsername}</span></span>
+        </div>
+      )}
 
       {session.notes && (
         <p className="mb-6 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-300">
@@ -159,12 +186,13 @@ export default async function SessionDetailPage({ params }: PageProps) {
                 {playersWithResults.map((sp) => {
                   const isLinked = linkedPlayerIds.has(sp.playerId);
                   const inviteStatus = inviteBySessionPlayerId.get(sp.id);
+                  const isInviter = sp.playerId === inviterPlayerId;
                   return (
                     <tr key={sp.id} className="bg-zinc-950">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-zinc-100">{sp.player.name}</span>
-                          {(isLinked || inviteStatus) && (
+                          {!isInviter && (isLinked || inviteStatus) && (
                             <SharePlayerButton
                               sessionId={session.id}
                               sessionPlayerId={sp.id}
@@ -192,25 +220,14 @@ export default async function SessionDetailPage({ params }: PageProps) {
             Also Played
           </h2>
           <div className="flex flex-wrap gap-2">
-            {playersPresenceOnly.map((sp) => {
-              const isLinked = linkedPlayerIds.has(sp.playerId);
-              const inviteStatus = inviteBySessionPlayerId.get(sp.id);
-              return (
-                <div
-                  key={sp.id}
-                  className="flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-900 py-1 pl-3 pr-2 text-sm text-zinc-300"
-                >
-                  <span>{sp.player.name}</span>
-                  {(isLinked || inviteStatus) && (
-                    <SharePlayerButton
-                      sessionId={session.id}
-                      sessionPlayerId={sp.id}
-                      initialStatus={inviteStatus ?? null}
-                    />
-                  )}
-                </div>
-              );
-            })}
+            {playersPresenceOnly.map((sp) => (
+              <div
+                key={sp.id}
+                className="flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-900 py-1 pl-3 pr-2 text-sm text-zinc-300"
+              >
+                <span>{sp.player.name}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
