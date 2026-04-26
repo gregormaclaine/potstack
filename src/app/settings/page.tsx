@@ -1,7 +1,11 @@
 "use client";
 
+import { useState } from "react";
+import { signOut } from "next-auth/react";
 import PageWrapper from "@/components/layout/PageWrapper";
 import { useSettings, type CurrencyCode } from "@/contexts/SettingsContext";
+import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 
 const CURRENCIES: { code: CurrencyCode; symbol: string; name: string }[] = [
   { code: "GBP", symbol: "£", name: "British Pound" },
@@ -15,6 +19,18 @@ const CURRENCIES: { code: CurrencyCode; symbol: string; name: string }[] = [
 
 export default function SettingsPage() {
   const { curvedCharts, setCurvedCharts, currency, setCurrency } = useSettings();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    try {
+      await fetch("/api/user", { method: "DELETE" });
+      await signOut({ callbackUrl: "/" });
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <PageWrapper>
@@ -88,7 +104,41 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* Danger zone */}
+        <section>
+          <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            Danger Zone
+          </h2>
+          <div className="rounded-xl border border-red-900/50 bg-zinc-900 px-5 py-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-zinc-200">Delete account</p>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Permanently deletes your account and all associated data.
+              </p>
+            </div>
+            <Button variant="danger" size="sm" onClick={() => setDeleteOpen(true)}>
+              Delete account
+            </Button>
+          </div>
+        </section>
+
       </div>
+
+      <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Account">
+        <p className="mb-4 text-sm text-zinc-400">
+          Are you sure you want to delete your account? This will permanently remove all your
+          sessions, players, and data. <span className="text-zinc-200 font-medium">This cannot be undone.</span>
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button variant="danger" loading={deleting} onClick={handleDeleteAccount}>
+            Delete my account
+          </Button>
+        </div>
+      </Modal>
+
     </PageWrapper>
   );
 }
