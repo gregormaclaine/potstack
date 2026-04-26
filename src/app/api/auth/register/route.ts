@@ -6,6 +6,7 @@ import { captureEvent } from "@/lib/posthog";
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const username = (body.username ?? "").trim();
+  const usernameKey = username.toLowerCase();
   const password = body.password ?? "";
 
   if (!username) {
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const existing = await prisma.user.findUnique({ where: { username } });
+  const existing = await prisma.user.findUnique({ where: { usernameKey } });
   if (existing) {
     return NextResponse.json(
       { error: "That username is already taken" },
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({
-    data: { username, passwordHash },
+    data: { username, usernameKey, passwordHash },
   });
 
   captureEvent(user.username, "user registered");
