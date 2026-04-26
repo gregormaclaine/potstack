@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Potstack
 
-## Getting Started
+A personal poker session tracker. Log your sessions, track profits, manage players, and see stats broken down by player or group.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Log poker sessions with buy-in, cash-out, location, notes, and players
+- Track per-player results within a session
+- Organise players into groups
+- Dashboard with profit/loss charts over time
+- Breakdowns page with win rates and stats per player and group
+- Link your player entries to other users so shared sessions can be imported
+- Session invites — accept a session logged by another user to add it to your own history
+- Notifications for incoming invites and link requests
+- User settings: currency, chart style, avatar
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- [Next.js 16](https://nextjs.org) (App Router)
+- [TypeScript](https://www.typescriptlang.org)
+- [Tailwind CSS v4](https://tailwindcss.com)
+- [Prisma v6](https://www.prisma.io) + PostgreSQL
+- [NextAuth v5](https://authjs.dev) (credentials — username + password)
+- [Recharts](https://recharts.org)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Requirements
 
-## Learn More
+- Node.js 18+
+- PostgreSQL database
 
-To learn more about Next.js, take a look at the following resources:
+## Setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+2. Create a `.env.local` file in the project root:
+   ```
+   DATABASE_URL="postgresql://user:password@localhost:5432/potstack"
+   AUTH_SECRET="a-random-secret-string"
+   ```
 
-## Deploy on Vercel
+3. Push the database schema:
+   ```bash
+   npx prisma db push
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+4. Generate the Prisma client:
+   ```bash
+   npx prisma generate
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+5. Start the dev server:
+   ```bash
+   npm run dev
+   ```
+
+The app runs at [http://localhost:3000](http://localhost:3000). Register an account on first use.
+
+## Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start development server |
+| `npm run build` | Production build |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
