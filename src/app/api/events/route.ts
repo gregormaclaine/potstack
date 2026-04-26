@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import type { CreateEventBody, PokerEvent } from "@/types";
+import { captureEvent } from "@/lib/posthog";
 
 function serializeEvent(e: {
   id: number;
@@ -58,6 +59,11 @@ export async function POST(req: Request) {
       color: color ?? "emerald",
       userId,
     },
+  });
+
+  captureEvent(session.user.name ?? `userId[${userId}]`, "event created", {
+    event_id: event.id,
+    name: event.name,
   });
 
   return NextResponse.json({ event: serializeEvent(event) }, { status: 201 });

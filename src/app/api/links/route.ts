@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { createNotification } from "@/lib/createNotification";
+import { captureEvent } from "@/lib/posthog";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -139,6 +140,11 @@ export async function POST(request: NextRequest) {
       requesterUsername: player.user.username,
       playerName: player.name,
     },
+  });
+
+  captureEvent(session.user.name ?? `userId[${userId}]`, "link requested", {
+    linked_username: body.linkedUsername,
+    player_name: player.name,
   });
 
   return NextResponse.json({ link }, { status: 201 });

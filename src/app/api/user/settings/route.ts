@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { captureEvent } from "@/lib/posthog";
 
 const VALID_CURRENCIES = new Set(["GBP", "USD", "EUR", "JPY", "CAD", "AUD", "CHF"]);
 
@@ -30,6 +31,8 @@ export async function PATCH(request: NextRequest) {
   }
 
   await prisma.user.update({ where: { id: userId }, data });
+
+  captureEvent(session.user.name ?? `userId[${userId}]`, "settings updated", data);
 
   return NextResponse.json({ ok: true });
 }

@@ -45,5 +45,9 @@ export async function PATCH(request: NextRequest) {
     select: { avatar: true },
   });
 
+  captureEvent(session.user.name ?? `userId[${userId}]`, "avatar updated", {
+    avatar: body.avatar ?? null,
+  });
+
   return NextResponse.json({ avatar: updated.avatar });
 }

@@ -7,6 +7,7 @@ import {
   deleteSessionInviteReceivedNotification,
 } from "@/lib/createNotification";
 import type { PlayerMapping } from "@/types";
+import { captureEvent } from "@/lib/posthog";
 
 export async function GET(
   _request: NextRequest,
@@ -134,6 +135,10 @@ export async function PATCH(
         data: { type: "session_invite_rejected", otherUsername: inviteeUsername, sessionDate, sessionLocation },
       }),
     ]);
+
+    captureEvent(session.user.name ?? `userId[${userId}]`, "session invite rejected", {
+      invite_id: Number(id),
+    });
 
     return NextResponse.json({ success: true });
   }
@@ -290,6 +295,12 @@ export async function PATCH(
       }),
     ]);
 
+    captureEvent(session.user.name ?? `userId[${userId}]`, "session invite accepted", {
+      invite_id: Number(id),
+      session_id: existingSessionId,
+      overwrite: true,
+    });
+
     return NextResponse.json({ sessionId: existingSessionId });
   }
 
@@ -357,6 +368,11 @@ export async function PATCH(
       data: { type: "session_invite_accepted", otherUsername: inviteeUsername, sessionDate, sessionLocation },
     }),
   ]);
+
+  captureEvent(session.user.name ?? `userId[${userId}]`, "session invite accepted", {
+    invite_id: Number(id),
+    session_id: newSession.id,
+  });
 
   return NextResponse.json({ sessionId: newSession.id });
 }

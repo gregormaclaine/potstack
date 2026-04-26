@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { createNotification } from "@/lib/createNotification";
+import { captureEvent } from "@/lib/posthog";
 
 export async function POST(
   request: NextRequest,
@@ -83,6 +84,11 @@ export async function POST(
       cashOut: sessionPlayer.cashOut,
       profit: sessionPlayer.profit,
     },
+  });
+
+  captureEvent(userSession.user.name ?? `userId[${userId}]`, "session shared", {
+    session_id: sessionId,
+    invite_id: invite.id,
   });
 
   return NextResponse.json({ invite: { id: invite.id, status: invite.status } });

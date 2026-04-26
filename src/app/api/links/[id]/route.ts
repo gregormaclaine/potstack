@@ -5,6 +5,7 @@ import {
   createNotification,
   deleteLinkRequestReceivedNotification,
 } from "@/lib/createNotification";
+import { captureEvent } from "@/lib/posthog";
 
 export async function GET(
   _request: NextRequest,
@@ -93,6 +94,10 @@ export async function PATCH(
       }),
     ]);
 
+    captureEvent(session.user.name ?? `userId[${userId}]`, "link rejected", {
+      link_id: Number(id),
+    });
+
     return NextResponse.json({ link: updated });
   }
 
@@ -158,6 +163,10 @@ export async function PATCH(
     }),
   ]);
 
+  captureEvent(session.user.name ?? `userId[${userId}]`, "link accepted", {
+    link_id: Number(id),
+  });
+
   return NextResponse.json({ link: updated });
 }
 
@@ -221,6 +230,11 @@ export async function DELETE(
       }),
     ]);
   }
+
+  captureEvent(session.user.name ?? `userId[${userId}]`, "link deleted", {
+    link_id: Number(id),
+    was_accepted: link.status === "ACCEPTED",
+  });
 
   return NextResponse.json({ success: true });
 }

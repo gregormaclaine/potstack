@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import type { UpdateEventBody, PokerEvent } from "@/types";
+import { captureEvent } from "@/lib/posthog";
 
 function serializeEvent(e: {
   id: number;
@@ -67,6 +68,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     },
   });
 
+  captureEvent(session.user.name ?? `userId[${userId}]`, "event updated", {
+    event_id: Number(id),
+  });
+
   return NextResponse.json({ event: serializeEvent(updated) });
 }
 
@@ -80,6 +85,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await prisma.event.delete({ where: { id: Number(id) } });
+
+  captureEvent(session.user.name ?? `userId[${userId}]`, "event deleted", {
+    event_id: Number(id),
+  });
 
   return NextResponse.json({ success: true });
 }

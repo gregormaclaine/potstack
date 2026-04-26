@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { computeAndSaveBreakdownStats } from "@/lib/computeBreakdownStats";
 import type { BreakdownStatsItem } from "@/types";
+import { captureEvent } from "@/lib/posthog";
 
 const REFRESH_RATE_LIMIT_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -86,6 +87,8 @@ export async function POST() {
       select: { breakdownLastRefreshedAt: true },
     }),
   ]);
+
+  captureEvent(session.user.name ?? `userId[${userId}]`, "breakdown stats refreshed");
 
   return NextResponse.json({
     stats: serializeStats(rows),
