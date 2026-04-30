@@ -6,6 +6,7 @@ import Navbar from "@/components/layout/Navbar";
 import PostHogProvider from "@/components/PostHogProvider";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import { SettingsProvider, type CurrencyCode } from "@/contexts/SettingsContext";
+import NotificationLoader from "@/components/layout/NotificationLoader";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -56,6 +57,7 @@ export default async function RootLayout({
         <SessionProvider>
           <PostHogProvider>
             <SettingsProvider initialSettings={initialSettings}>
+              <NotificationLoader />
               <Navbar />
               {children}
               <ImpersonationBanner />
