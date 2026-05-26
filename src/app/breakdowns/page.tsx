@@ -16,7 +16,7 @@ export default async function BreakdownsPage() {
     prisma.playerGroup.findMany({ where: { userId }, orderBy: { name: 'asc' } }),
   ]);
 
-  const playerMetas = new Map(rawPlayers.map(p => [p.id, { name: p.name, group: p.group }]));
+  const playerMetas = rawPlayers.map(p => [p.id, { name: p.name, group: p.group }]);
 
   const playerGroupMap = new Map(
     rawPlayers.filter(p => p.groupId !== null).map(p => [p.id, p.groupId as number]),
@@ -26,7 +26,7 @@ export default async function BreakdownsPage() {
     <PageWrapper>
       <BreakdownsView
         sessions={sessions}
-        playerMetas={Object.fromEntries(playerMetas)}
+        playerMetas={playerMetas}
         playerGroupMap={Object.fromEntries(playerGroupMap)}
         groups={rawGroups}
       />

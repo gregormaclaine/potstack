@@ -12,27 +12,27 @@ datasource db {
 }
 
 model User {
-  id                         Int              @id @default(autoincrement())
-  username                   String           @unique
-  usernameKey                String           @unique
-  passwordHash               String
-  isAdmin                    Boolean          @default(false)
-  avatar                     String?
-  createdAt                  DateTime         @default(now())
-  breakdownLastRefreshedAt   DateTime?
-  settingsCurvedCharts       Boolean          @default(true)
-  settingsCurrency           String           @default("GBP")
-  groupSearches              Json             @default("[]")
-  sessions                   Session[]
-  players                    Player[]
-  playerGroups               PlayerGroup[]
-  ownerLinks                 PlayerLink[]     @relation("OwnerLinks")
-  linkedLinks                PlayerLink[]     @relation("LinkedLinks")
-  sessionInvites             SessionInvite[]  @relation("ReceivedInvites")
-  breakdownStats             BreakdownStats[]
-  notifications              Notification[]
-  events                     Event[]
-  acceptedSessions           AcceptedSession[]
+  id                       Int               @id @default(autoincrement())
+  username                 String            @unique
+  usernameKey              String            @unique
+  passwordHash             String
+  isAdmin                  Boolean           @default(false)
+  avatar                   String?
+  createdAt                DateTime          @default(now())
+  breakdownLastRefreshedAt DateTime?
+  settingsCurvedCharts     Boolean           @default(true)
+  settingsCurrency         String            @default("GBP")
+  groupSearches            Json              @default("[]")
+  sessions                 Session[]
+  players                  Player[]
+  playerGroups             PlayerGroup[]
+  ownerLinks               PlayerLink[]      @relation("OwnerLinks")
+  linkedLinks              PlayerLink[]      @relation("LinkedLinks")
+  sessionInvites           SessionInvite[]   @relation("ReceivedInvites")
+  breakdownStats           BreakdownStats[]
+  notifications            Notification[]
+  events                   Event[]
+  acceptedSessions         AcceptedSession[]
 }
 
 model Event {
@@ -61,76 +61,78 @@ model PlayerGroup {
 }
 
 model Player {
-  id        Int             @id @default(autoincrement())
-  name      String
-  createdAt DateTime        @default(now())
-  sessions  SessionPlayer[]
-  groupId   Int?
-  group     PlayerGroup?    @relation(fields: [groupId], references: [id])
-  userId    Int
-  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ownerLinks        PlayerLink[]        @relation("OwnerPlayer")
-  linkedLinks       PlayerLink[]        @relation("LinkedPlayer")
-  fromEquivalences  PlayerEquivalence[] @relation("FromEquivalences")
-  toEquivalences    PlayerEquivalence[] @relation("ToEquivalences")
+  id               Int                 @id @default(autoincrement())
+  name             String
+  createdAt        DateTime            @default(now())
+  sessions         SessionPlayer[]
+  groupId          Int?
+  group            PlayerGroup?        @relation(fields: [groupId], references: [id])
+  userId           Int
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ownerLinks       PlayerLink[]        @relation("OwnerPlayer")
+  linkedLinks      PlayerLink[]        @relation("LinkedPlayer")
+  fromEquivalences PlayerEquivalence[] @relation("FromEquivalences")
+  toEquivalences   PlayerEquivalence[] @relation("ToEquivalences")
 
   @@unique([userId, name])
 }
 
 model Session {
-  id              Int               @id @default(autoincrement())
-  date            DateTime
-  location        String?
-  notes           String?
-  buyIn           Float
-  cashOut         Float
-  profit          Float
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  players         SessionPlayer[]
-  userId          Int
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  invites         SessionInvite[]
-  notifications   Notification[]
-  acceptedBy      AcceptedSession[]
+  id            Int               @id @default(autoincrement())
+  date          DateTime
+  location      String?
+  notes         String?
+  buyIn         Float
+  cashOut       Float
+  profit        Float
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  players       SessionPlayer[]
+  userId        Int
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invites       SessionInvite[]
+  notifications Notification[]
+  acceptedBy    AcceptedSession[]
 }
 
 model SessionPlayer {
-  id        Int            @id @default(autoincrement())
-  buyIn     Float?
-  cashOut   Float?
-  profit    Float?
+  id      Int    @id @default(autoincrement())
+  buyIn   Float?
+  cashOut Float?
+  profit  Float?
 
-  session   Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sessionId Int
-  player    Player         @relation(fields: [playerId], references: [id])
-  playerId  Int
-  invite    SessionInvite?
+  session         Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId       Int
+  player          Player           @relation(fields: [playerId], references: [id])
+  playerId        Int
+  invite          SessionInvite?
+  acceptedSession AcceptedSession? @relation("AcceptedSessionPlayer")
 
   @@unique([sessionId, playerId])
 }
 
 model PlayerLink {
-  id              Int             @id @default(autoincrement())
-  status          String          @default("PENDING")
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id        Int      @id @default(autoincrement())
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  ownerPlayerId   Int             @unique
-  ownerPlayer     Player          @relation("OwnerPlayer", fields: [ownerPlayerId], references: [id], onDelete: Cascade)
+  ownerPlayerId Int    @unique
+  ownerPlayer   Player @relation("OwnerPlayer", fields: [ownerPlayerId], references: [id], onDelete: Cascade)
 
-  ownerUserId     Int
-  ownerUser       User            @relation("OwnerLinks", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  ownerUserId Int
+  ownerUser   User @relation("OwnerLinks", fields: [ownerUserId], references: [id], onDelete: Cascade)
 
-  linkedUserId    Int
-  linkedUser      User            @relation("LinkedLinks", fields: [linkedUserId], references: [id], onDelete: Cascade)
+  linkedUserId Int
+  linkedUser   User @relation("LinkedLinks", fields: [linkedUserId], references: [id], onDelete: Cascade)
 
-  linkedPlayerId  Int?            @unique
-  linkedPlayer    Player?         @relation("LinkedPlayer", fields: [linkedPlayerId], references: [id])
+  linkedPlayerId Int?    @unique
+  linkedPlayer   Player? @relation("LinkedPlayer", fields: [linkedPlayerId], references: [id])
 
-  sessionInvites  SessionInvite[]
-  equivalences    PlayerEquivalence[]
-  notifications   Notification[]
+  sessionInvites   SessionInvite[]
+  equivalences     PlayerEquivalence[]
+  notifications    Notification[]
+  acceptedSessions AcceptedSession[]   @relation("AcceptedSessionLink")
 
   @@unique([ownerPlayerId, linkedUserId])
 }
@@ -148,24 +150,24 @@ model PlayerEquivalence {
 }
 
 model SessionInvite {
-  id              Int           @id @default(autoincrement())
-  status          String        @default("PENDING")
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id        Int      @id @default(autoincrement())
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  sessionId       Int
-  session         Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId Int
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   sessionPlayerId Int           @unique
   sessionPlayer   SessionPlayer @relation(fields: [sessionPlayerId], references: [id], onDelete: Cascade)
 
-  linkId          Int
-  link            PlayerLink    @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  linkId Int
+  link   PlayerLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
 
   inviteeId       Int
-  invitee         User          @relation("ReceivedInvites", fields: [inviteeId], references: [id], onDelete: Cascade)
-  notifications    Notification[]
-  acceptedSession  AcceptedSession?
+  invitee         User             @relation("ReceivedInvites", fields: [inviteeId], references: [id], onDelete: Cascade)
+  notifications   Notification[]
+  acceptedSession AcceptedSession?
 
   @@unique([sessionId, linkId])
 }
@@ -181,23 +183,23 @@ model Notification {
   // Nullable FKs — nulled via SetNull when the referenced record is deleted.
   // Presence/absence drives action-button visibility and session link rendering.
   sessionId Int?
-  session   Session?      @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  session   Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
-  linkId    Int?
-  link      PlayerLink?   @relation(fields: [linkId], references: [id], onDelete: SetNull)
+  linkId Int?
+  link   PlayerLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
 
-  inviteId  Int?
-  invite    SessionInvite? @relation(fields: [inviteId], references: [id], onDelete: SetNull)
+  inviteId Int?
+  invite   SessionInvite? @relation(fields: [inviteId], references: [id], onDelete: SetNull)
 
-  data      Json
+  data Json
 }
 
 model BreakdownStats {
   id                Int      @id @default(autoincrement())
   userId            Int
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  entityType        String   // "player" | "group"
-  entityId          Int      // playerId, groupId, or -1 for Ungrouped
+  entityType        String // "player" | "group"
+  entityId          Int // playerId, groupId, or -1 for Ungrouped
   winRateCILow      Float
   winRateCIHigh     Float
   profitProbability Float
@@ -209,17 +211,21 @@ model BreakdownStats {
 }
 
 model AcceptedSession {
-  id            Int           @id @default(autoincrement())
-  userId        Int
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sessionId     Int
-  session       Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  inviteId      Int           @unique
-  invite        SessionInvite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
-  localLocation String?
-  localNotes    String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id              Int            @id @default(autoincrement())
+  userId          Int
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId       Int
+  session         Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  inviteId        Int?           @unique
+  invite          SessionInvite? @relation(fields: [inviteId], references: [id], onDelete: SetNull)
+  sessionPlayerId Int            @unique
+  sessionPlayer   SessionPlayer  @relation("AcceptedSessionPlayer", fields: [sessionPlayerId], references: [id], onDelete: SetNull)
+  linkId          Int
+  link            PlayerLink     @relation("AcceptedSessionLink", fields: [linkId], references: [id], onDelete: SetNull)
+  localLocation   String?
+  localNotes      String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@unique([userId, sessionId])
 }

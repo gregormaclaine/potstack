@@ -161,6 +161,16 @@ type RawAccepted = {
   localNotes: string | null;
   createdAt: Date;
   updatedAt: Date;
+  sessionPlayer: { buyIn: number | null; cashOut: number | null; profit: number | null };
+  link: {
+    id: number;
+    ownerUserId: number;
+    ownerPlayerId: number;
+    linkedUserId: number;
+    linkedPlayerId: number | null;
+    ownerPlayer: { id: number; name: string; group: PlayerGroup | null };
+    linkedPlayer: { id: number; name: string; group: PlayerGroup | null } | null;
+  };
   session: {
     date: Date;
     location: string | null;
@@ -177,19 +187,6 @@ type RawAccepted = {
       player: { name: string };
     }>;
   };
-  invite: {
-    id: number;
-    sessionPlayer: { buyIn: number | null; cashOut: number | null; profit: number | null } | null;
-    link: {
-      id: number;
-      ownerUserId: number;
-      ownerPlayerId: number;
-      linkedUserId: number;
-      linkedPlayerId: number | null;
-      ownerPlayer: { id: number; name: string; group: PlayerGroup | null };
-      linkedPlayer: { id: number; name: string; group: PlayerGroup | null } | null;
-    };
-  };
 };
 
 function mapAcceptedSession(
@@ -198,10 +195,9 @@ function mapAcceptedSession(
   linkGraphResolved: Map<number, PlayerInfoWithUsername>,
   equivalenceMap: Map<string, PlayerInfo>,
 ): UnifiedSession {
-  const link = raw.invite.link;
-  const inviteeIsOwner = userId === link.ownerUserId;
-  const excludePlayerId = inviteeIsOwner ? link.linkedPlayerId : link.ownerPlayerId;
-  const inviterPlayer = inviteeIsOwner ? link.ownerPlayer : link.linkedPlayer;
+  const inviteeIsOwner = userId === raw.link.ownerUserId;
+  const excludePlayerId = inviteeIsOwner ? raw.link.linkedPlayerId : raw.link.ownerPlayerId;
+  const inviterPlayer = inviteeIsOwner ? raw.link.ownerPlayer : raw.link.linkedPlayer;
 
   const otherPlayers = raw.session.players.filter(sp => sp.playerId !== excludePlayerId);
 
@@ -233,7 +229,7 @@ function mapAcceptedSession(
       };
     }
 
-    const eqMatch = equivalenceMap.get(`${sp.playerId}_${link.id}`);
+    const eqMatch = equivalenceMap.get(`${sp.playerId}_${raw.link.id}`);
     if (eqMatch) {
       return {
         playerId: eqMatch.id,
@@ -261,8 +257,6 @@ function mapAcceptedSession(
     };
   });
 
-  const sp = raw.invite.sessionPlayer;
-
   return {
     id: raw.id,
     sessionId: raw.sessionId,
@@ -270,9 +264,9 @@ function mapAcceptedSession(
     date: raw.session.date.toISOString(),
     location: raw.localLocation ?? raw.session.location,
     notes: raw.localNotes ?? raw.session.notes,
-    buyIn: sp?.buyIn ?? 0,
-    cashOut: sp?.cashOut ?? 0,
-    profit: sp?.profit ?? 0,
+    buyIn: raw.sessionPlayer.buyIn ?? 0,
+    cashOut: raw.sessionPlayer.cashOut ?? 0,
+    profit: raw.sessionPlayer.profit ?? 0,
     createdAt: raw.createdAt.toISOString(),
     updatedAt: raw.updatedAt.toISOString(),
     players: [inviterEntry, ...otherEntries],
@@ -286,14 +280,13 @@ async function buildAcceptedSessions(rawAccepted: RawAccepted[], userId: number)
   const allLinkIds = new Set<number>();
 
   for (const raw of rawAccepted) {
-    const link = raw.invite.link;
-    const inviteeIsOwner = userId === link.ownerUserId;
-    const excludePlayerId = inviteeIsOwner ? link.linkedPlayerId : link.ownerPlayerId;
+    const inviteeIsOwner = userId === raw.link.ownerUserId;
+    const excludePlayerId = inviteeIsOwner ? raw.link.linkedPlayerId : raw.link.ownerPlayerId;
 
     for (const sp of raw.session.players) {
       if (sp.playerId !== excludePlayerId) allOtherPlayerIds.add(sp.playerId);
     }
-    allLinkIds.add(link.id);
+    allLinkIds.add(raw.link.id);
   }
 
   const { linkGraphResolved, equivalenceMap } = await resolvePlayersBatch(
@@ -335,24 +328,19 @@ export async function fetchAllForUser(userId: number): Promise<UnifiedSession[]>
             },
           },
         },
-        invite: {
+        sessionPlayer: { select: { buyIn: true, cashOut: true, profit: true } },
+        link: {
           select: {
             id: true,
-            sessionPlayer: { select: { buyIn: true, cashOut: true, profit: true } },
-            link: {
-              select: {
-                id: true,
-                ownerUserId: true,
-                ownerPlayerId: true,
-                linkedUserId: true,
-                linkedPlayerId: true,
-                ownerPlayer: {
-                  select: { id: true, name: true, group: { select: { id: true, name: true, color: true } } },
-                },
-                linkedPlayer: {
-                  select: { id: true, name: true, group: { select: { id: true, name: true, color: true } } },
-                },
-              },
+            ownerUserId: true,
+            ownerPlayerId: true,
+            linkedUserId: true,
+            linkedPlayerId: true,
+            ownerPlayer: {
+              select: { id: true, name: true, group: { select: { id: true, name: true, color: true } } },
+            },
+            linkedPlayer: {
+              select: { id: true, name: true, group: { select: { id: true, name: true, color: true } } },
             },
           },
         },

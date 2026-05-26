@@ -6,18 +6,19 @@ import type {
   CumulativePlayerPoint,
   CumulativePlayerMeta,
   GroupSessionDetail,
-} from "@/types";
+  UnifiedSessionPlayer,
+} from '@/types';
 
 const PLAYER_LINE_COLORS: string[] = [
-  "#10b981", // emerald — always "You"
-  "#38bdf8", // sky
-  "#a78bfa", // violet
-  "#fbbf24", // amber
-  "#fb7185", // rose
-  "#22d3ee", // cyan
-  "#fb923c", // orange
-  "#84cc16", // lime
-  "#e879f9", // fuchsia
+  '#10b981', // emerald — always "You"
+  '#38bdf8', // sky
+  '#a78bfa', // violet
+  '#fbbf24', // amber
+  '#fb7185', // rose
+  '#22d3ee', // cyan
+  '#fb923c', // orange
+  '#84cc16', // lime
+  '#e879f9', // fuchsia
 ];
 
 interface PlayerMeta {
@@ -26,18 +27,27 @@ interface PlayerMeta {
 }
 
 function buildRow(
-  sessions: UnifiedSession[]
-): Omit<PlayerBreakdownRow | GroupBreakdownRow, "playerId" | "groupId" | "name" | "color" | "group"> {
-  const profits = sessions.map((s) => s.profit);
+  sessions: UnifiedSession[],
+): Omit<PlayerBreakdownRow | GroupBreakdownRow, 'playerId' | 'groupId' | 'name' | 'color' | 'group'> {
+  const profits = sessions.map(s => s.profit);
   const totalBuyIn = sessions.reduce((sum, s) => sum + s.buyIn, 0);
   const totalCashOut = sessions.reduce((sum, s) => sum + s.cashOut, 0);
   const profit = sessions.reduce((sum, s) => sum + s.profit, 0);
   const avgProfit = sessions.length > 0 ? profit / sessions.length : 0;
   const maxProfit = profits.length > 0 ? Math.max(...profits) : 0;
   const maxLoss = profits.length > 0 ? Math.min(...profits) : 0;
-  const wins = profits.filter((p) => p > 0).length;
+  const wins = profits.filter(p => p > 0).length;
   const winRate = sessions.length > 0 ? (wins / sessions.length) * 100 : 0;
-  return { sessions: sessions.length, totalBuyIn, totalCashOut, profit, avgProfit, maxProfit, maxLoss, winRate };
+  return {
+    sessions: sessions.length,
+    totalBuyIn,
+    totalCashOut,
+    profit,
+    avgProfit,
+    maxProfit,
+    maxLoss,
+    winRate,
+  };
 }
 
 /**
@@ -46,18 +56,18 @@ function buildRow(
  */
 export function getSessionsPerPlayer(
   sessions: UnifiedSession[],
-  minSessions = 3
+  minSessions = 3,
 ): Map<number, UnifiedSession[]> {
   const map = new Map<number, UnifiedSession[]>();
 
   for (const session of sessions) {
     for (const sp of session.players) {
-      if (sp.isMe) continue;
-      const existing = map.get(sp.playerId!);
+      if (sp.playerId === null) continue;
+      const existing = map.get(sp.playerId);
       if (existing) {
         existing.push(session);
       } else {
-        map.set(sp.playerId!, [session]);
+        map.set(sp.playerId, [session]);
       }
     }
   }
@@ -78,7 +88,7 @@ export type SessionGroupLabel = { id: number | null; name: string; color: string
  * Mirrors the per-session logic inside getSessionsPerGroup.
  */
 export function getSessionPredominantGroups(
-  players: ReadonlyArray<{ group?: { id: number; name: string; color: string } | null }>
+  players: ReadonlyArray<{ group?: { id: number; name: string; color: string } | null }>,
 ): SessionGroupLabel[] {
   if (players.length === 0) return [];
 
@@ -100,7 +110,7 @@ export function getSessionPredominantGroups(
 
   const ungroupedCount = players.length - playersWithAnyGroup;
   if (ungroupedCount / players.length > 0.5) {
-    return [{ id: null, name: "Ungrouped", color: "zinc" }];
+    return [{ id: null, name: 'Ungrouped', color: 'zinc' }];
   }
 
   const result: SessionGroupLabel[] = [];
@@ -120,19 +130,18 @@ export function getSessionPredominantGroups(
  */
 export function getSessionsPerGroup(
   sessions: UnifiedSession[],
-  playerGroupMap: Map<number, number> // playerId → groupId
+  playerGroupMap: Map<number, number>, // playerId → groupId
 ): Map<number, UnifiedSession[]> {
   const map = new Map<number, UnifiedSession[]>();
   const ungroupedSessions: UnifiedSession[] = [];
 
   for (const session of sessions) {
-    const opponents = session.players.filter((p) => !p.isMe);
-    const totalPlayers = opponents.length;
+    const totalPlayers = session.players.length;
     if (totalPlayers === 0) continue;
 
     let playersWithAnyGroup = 0;
     const groupCounts = new Map<number, number>();
-    for (const sp of opponents) {
+    for (const sp of session.players) {
       const gid = playerGroupMap.get(sp.playerId!);
       if (gid !== undefined) {
         playersWithAnyGroup += 1;
@@ -172,18 +181,30 @@ export function getSessionsPerGroup(
  */
 export function buildPlayerBreakdowns(
   sessions: UnifiedSession[],
-  playerMetas: Map<number, PlayerMeta>
+  minSessions: number = 3,
 ): PlayerBreakdownRow[] {
-  const map = getSessionsPerPlayer(sessions);
+  const map = new Map<number, { sessions: UnifiedSession[]; info: UnifiedSessionPlayer }>();
+
+  for (const session of sessions) {
+    for (const sp of session.players) {
+      if (sp.playerId === null) continue;
+      const existing = map.get(sp.playerId);
+      if (existing) {
+        existing.sessions.push(session);
+      } else {
+        map.set(sp.playerId, { sessions: [session], info: sp });
+      }
+    }
+  }
 
   const rows: PlayerBreakdownRow[] = [];
   for (const [playerId, playerSessions] of map.entries()) {
-    const meta = playerMetas.get(playerId);
+    if (playerSessions.sessions.length < minSessions) continue;
     rows.push({
       playerId,
-      name: meta?.name ?? `Player #${playerId}`,
-      group: meta?.group ?? null,
-      ...buildRow(playerSessions),
+      name: playerSessions.info.playerName,
+      group: playerSessions.info.group,
+      ...buildRow(playerSessions.sessions),
     });
   }
 
@@ -199,9 +220,7 @@ export function getSessionsForGroup(
   groupId: number,
   playerGroupMap: Map<number, number>,
 ): UnifiedSession[] {
-  return sessions.filter((s) =>
-    s.players.some((sp) => !sp.isMe && playerGroupMap.get(sp.playerId!) === groupId)
-  );
+  return sessions.filter(s => s.players.some(sp => !sp.isMe && playerGroupMap.get(sp.playerId!) === groupId));
 }
 
 export interface GroupSessionPlayerRow {
@@ -231,31 +250,36 @@ export function buildGroupSessionPlayerRows(
 ): GroupSessionPlayerRow[] {
   // "You" row — always has complete data
   const youRow: GroupSessionPlayerRow = {
-    key: "me",
-    name: "You",
+    key: 'me',
+    name: 'You',
     isMe: true,
     sessions: filteredSessions.length,
     totalBuyIn: filteredSessions.reduce((s, r) => s + r.buyIn, 0),
     totalCashOut: filteredSessions.reduce((s, r) => s + r.cashOut, 0),
     profit: filteredSessions.reduce((s, r) => s + r.profit, 0),
-    avgProfit: filteredSessions.length > 0
-      ? filteredSessions.reduce((s, r) => s + r.profit, 0) / filteredSessions.length
-      : 0,
-    maxProfit: filteredSessions.length > 0 ? Math.max(...filteredSessions.map((r) => r.profit)) : 0,
-    maxLoss: filteredSessions.length > 0 ? Math.min(...filteredSessions.map((r) => r.profit)) : 0,
-    winRate: filteredSessions.length > 0
-      ? (filteredSessions.filter((r) => r.profit > 0).length / filteredSessions.length) * 100
-      : 0,
+    avgProfit:
+      filteredSessions.length > 0
+        ? filteredSessions.reduce((s, r) => s + r.profit, 0) / filteredSessions.length
+        : 0,
+    maxProfit: filteredSessions.length > 0 ? Math.max(...filteredSessions.map(r => r.profit)) : 0,
+    maxLoss: filteredSessions.length > 0 ? Math.min(...filteredSessions.map(r => r.profit)) : 0,
+    winRate:
+      filteredSessions.length > 0
+        ? (filteredSessions.filter(r => r.profit > 0).length / filteredSessions.length) * 100
+        : 0,
   };
 
   // Opponent rows
-  const opponentMap = new Map<number, {
-    name: string;
-    appearances: number;
-    buyIns: number[];
-    cashOuts: number[];
-    profits: number[];
-  }>();
+  const opponentMap = new Map<
+    number,
+    {
+      name: string;
+      appearances: number;
+      buyIns: number[];
+      cashOuts: number[];
+      profits: number[];
+    }
+  >();
 
   for (const session of filteredSessions) {
     for (const sp of session.players) {
@@ -293,7 +317,7 @@ export function buildGroupSessionPlayerRows(
       avgProfit: profits.length > 0 ? profits.reduce((s, v) => s + v, 0) / profits.length : null,
       maxProfit: profits.length > 0 ? Math.max(...profits) : null,
       maxLoss: profits.length > 0 ? Math.min(...profits) : null,
-      winRate: profits.length > 0 ? (profits.filter((p) => p > 0).length / profits.length) * 100 : null,
+      winRate: profits.length > 0 ? (profits.filter(p => p > 0).length / profits.length) * 100 : null,
     });
   }
 
@@ -318,8 +342,8 @@ export function buildCumulativeByPlayer(
   if (filteredSessions.length === 0) return { points: [], players: [] };
 
   // Collect group-member player keys in first-appearance order
-  const allKeys: string[] = ["me"];
-  const nameMap = new Map<string, string>([["me", "You"]]);
+  const allKeys: string[] = ['me'];
+  const nameMap = new Map<string, string>([['me', 'You']]);
 
   for (const session of filteredSessions) {
     for (const sp of session.players) {
@@ -340,7 +364,7 @@ export function buildCumulativeByPlayer(
   }
 
   // Build cumulative points
-  const cumulative = new Map<string, number>(allKeys.map((k) => [k, 0]));
+  const cumulative = new Map<string, number>(allKeys.map(k => [k, 0]));
 
   // Zero-origin point (sessionIndex 0, same date as first session)
   const zeroPoint: CumulativePlayerPoint = { sessionIndex: 0, date: filteredSessions[0].date };
@@ -351,13 +375,13 @@ export function buildCumulativeByPlayer(
     const session = filteredSessions[i];
 
     // Update "me"
-    cumulative.set("me", (cumulative.get("me") ?? 0) + session.profit);
+    cumulative.set('me', (cumulative.get('me') ?? 0) + session.profit);
 
     // Update each opponent key (carry-forward if absent or null)
     for (const key of allKeys) {
-      if (key === "me") continue;
-      const playerId = Number(key.replace("player_", ""));
-      const sp = session.players.find((p) => p.playerId === playerId);
+      if (key === 'me') continue;
+      const playerId = Number(key.replace('player_', ''));
+      const sp = session.players.find(p => p.playerId === playerId);
       if (sp && sp.profit !== null) {
         cumulative.set(key, (cumulative.get(key) ?? 0) + sp.profit);
       }
@@ -371,10 +395,10 @@ export function buildCumulativeByPlayer(
     points.push(point);
   }
 
-  const players: CumulativePlayerMeta[] = allKeys.map((key) => ({
+  const players: CumulativePlayerMeta[] = allKeys.map(key => ({
     key,
     name: nameMap.get(key) ?? key,
-    color: colorMap.get(key) ?? "#71717a",
+    color: colorMap.get(key) ?? '#71717a',
   }));
 
   return { points, players };
@@ -389,19 +413,17 @@ export function buildGroupSessionDetails(
   playerGroupMap: Map<number, number>,
   extraPlayerIds: Set<number> = new Set(),
 ): GroupSessionDetail[] {
-  return filteredSessions.map((session) => {
+  return filteredSessions.map(session => {
     const isGroupMember = (playerId: number) =>
       playerGroupMap.get(playerId) === groupId || extraPlayerIds.has(playerId);
 
-    const opponents = session.players.filter((sp) => !sp.isMe);
-    const nonGroupPlayers = opponents.filter((sp) => !isGroupMember(sp.playerId!)).length;
+    const opponents = session.players.filter(sp => !sp.isMe);
+    const nonGroupPlayers = opponents.filter(sp => !isGroupMember(sp.playerId!)).length;
 
-    const totalOnTable = session.players
-      .filter((p) => p.buyIn !== null)
-      .reduce((sum, p) => sum + p.buyIn!, 0);
+    const totalOnTable = session.players.filter(p => p.buyIn !== null).reduce((sum, p) => sum + p.buyIn!, 0);
 
     const groupNetRaw = session.players
-      .filter((p) => p.profit !== null && (p.isMe || (p.playerId !== null && isGroupMember(p.playerId))))
+      .filter(p => p.profit !== null && (p.isMe || (p.playerId !== null && isGroupMember(p.playerId))))
       .reduce((sum, p) => sum + p.profit!, 0);
     const groupNet = Math.round(groupNetRaw * 100) / 100;
 
@@ -424,14 +446,14 @@ export function buildGroupSessionDetails(
 export function buildGroupBreakdowns(
   sessions: UnifiedSession[],
   groups: PlayerGroup[],
-  playerGroupMap: Map<number, number> // playerId → groupId
+  playerGroupMap: Map<number, number>, // playerId → groupId
 ): GroupBreakdownRow[] {
   const map = getSessionsPerGroup(sessions, playerGroupMap);
 
   const ungroupedSessions = map.get(-1) ?? [];
   const rows = groups
-    .filter((g) => map.has(g.id))
-    .map((g) => ({
+    .filter(g => map.has(g.id))
+    .map(g => ({
       groupId: g.id,
       name: g.name,
       color: g.color,
@@ -442,8 +464,8 @@ export function buildGroupBreakdowns(
   if (ungroupedSessions.length > 0) {
     rows.push({
       groupId: -1,
-      name: "Ungrouped",
-      color: "zinc",
+      name: 'Ungrouped',
+      color: 'zinc',
       ...buildRow(ungroupedSessions),
     });
   }
