@@ -168,8 +168,6 @@ model SessionInvite {
   invitee         User             @relation("ReceivedInvites", fields: [inviteeId], references: [id], onDelete: Cascade)
   notifications   Notification[]
   acceptedSession AcceptedSession?
-
-  @@unique([sessionId, linkId])
 }
 
 model Notification {

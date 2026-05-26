@@ -112,7 +112,7 @@ export async function generateSessionInvites(
   const createdInvites = await Promise.all(
     inviteData.map((d) =>
       prisma.sessionInvite.upsert({
-        where: { sessionId_linkId: { sessionId: d.sessionId, linkId: d.linkId } },
+        where: { sessionPlayerId: d.sessionPlayerId },
         update: {},
         create: d,
         include: { sessionPlayer: { select: { buyIn: true, cashOut: true, profit: true } } },

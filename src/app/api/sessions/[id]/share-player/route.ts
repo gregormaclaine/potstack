@@ -55,21 +55,29 @@ export async function POST(
   const inviteeId = ownerLink ? link.linkedUserId : link.ownerUserId;
 
   // Check if invite already exists
-  const existing = await prisma.sessionInvite.findUnique({
-    where: { sessionId_linkId: { sessionId, linkId: link.id } },
+  const existing = await prisma.sessionInvite.findFirst({
+    where: { sessionId, linkId: link.id },
   });
-  if (existing) {
+
+  // If a pending invite already exists, nothing to do
+  if (existing?.status === "PENDING") {
     return NextResponse.json({ invite: { id: existing.id, status: existing.status } });
   }
 
-  const invite = await prisma.sessionInvite.create({
-    data: {
-      sessionId,
-      sessionPlayerId: sessionPlayer.id,
-      linkId: link.id,
-      inviteeId,
-    },
-  });
+  // If a settled invite exists (ACCEPTED/REJECTED), reset it to PENDING for reshare
+  const invite = existing
+    ? await prisma.sessionInvite.update({
+        where: { id: existing.id },
+        data: { status: "PENDING" },
+      })
+    : await prisma.sessionInvite.create({
+        data: {
+          sessionId,
+          sessionPlayerId: sessionPlayer.id,
+          linkId: link.id,
+          inviteeId,
+        },
+      });
 
   await createNotification({
     userId: inviteeId,

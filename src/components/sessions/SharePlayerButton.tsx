@@ -1,39 +1,24 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
-
-type InviteStatus = "PENDING" | "ACCEPTED" | "REJECTED";
 
 interface Props {
   sessionId: number;
   sessionPlayerId: number;
-  initialStatus: InviteStatus | null;
+  reshare?: boolean;
 }
 
-const statusConfig: Record<InviteStatus, { label: string; classes: string; icon: ReactNode }> = {
-  PENDING:  { label: "Invite pending",  classes: "text-amber-400 border-amber-700 bg-amber-950",   icon: <PendingIcon /> },
-  ACCEPTED: { label: "Invite accepted", classes: "text-emerald-400 border-emerald-800 bg-emerald-950", icon: <AcceptedIcon /> },
-  REJECTED: { label: "Invite rejected", classes: "text-red-400 border-red-800 bg-red-950",         icon: <RejectedIcon /> },
-};
-
-export default function SharePlayerButton({ sessionId, sessionPlayerId, initialStatus }: Props) {
-  const [status, setStatus] = useState<InviteStatus | null>(initialStatus);
+export default function SharePlayerButton({ sessionId, sessionPlayerId, reshare }: Props) {
+  const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  if (status !== null) {
-    const { label, classes, icon } = statusConfig[status];
+  if (sent) {
     return (
-      <span
-        title={label}
-        className={clsx(
-          "inline-flex items-center rounded-full border p-1",
-          classes
-        )}
-      >
-        {icon}
+      <span title="Invite pending" className="inline-flex items-center rounded-full border border-amber-700 bg-amber-950 p-1 text-amber-400">
+        <PendingIcon />
       </span>
     );
   }
@@ -47,8 +32,7 @@ export default function SharePlayerButton({ sessionId, sessionPlayerId, initialS
         body: JSON.stringify({ sessionPlayerId }),
       });
       if (res.ok) {
-        const data = await res.json() as { invite: { status: InviteStatus } };
-        setStatus(data.invite.status);
+        setSent(true);
         router.refresh();
       }
     } finally {
@@ -69,16 +53,8 @@ export default function SharePlayerButton({ sessionId, sessionPlayerId, initialS
       )}
     >
       <SendIcon />
-      Share
+      {reshare ? "Reshare" : "Share"}
     </button>
-  );
-}
-
-function AcceptedIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
   );
 }
 
@@ -87,15 +63,6 @@ function PendingIcon() {
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
-
-function RejectedIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }

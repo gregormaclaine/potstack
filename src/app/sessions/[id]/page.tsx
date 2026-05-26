@@ -38,7 +38,9 @@ export default async function SessionDetailPage({ params }: PageProps) {
 
   // Find which player IDs have an accepted link with the current user (either direction)
   const sessionPlayerIds = session.players.map((sp) => sp.playerId);
-  const [ownerLinks, linkedLinks] = await Promise.all([
+  const allSessionPlayerIds = session.players.map((sp) => sp.id);
+
+  const [ownerLinks, linkedLinks, acceptedSessionsForPlayers] = await Promise.all([
     prisma.playerLink.findMany({
       where: { ownerUserId: userId, ownerPlayerId: { in: sessionPlayerIds }, status: "ACCEPTED" },
       select: { ownerPlayerId: true },
@@ -47,14 +49,23 @@ export default async function SessionDetailPage({ params }: PageProps) {
       where: { linkedUserId: userId, linkedPlayerId: { in: sessionPlayerIds }, status: "ACCEPTED" },
       select: { linkedPlayerId: true },
     }),
+    prisma.acceptedSession.findMany({
+      where: { sessionPlayerId: { in: allSessionPlayerIds } },
+      select: { sessionPlayerId: true },
+    }),
   ]);
   const linkedPlayerIds = new Set<number>([
     ...ownerLinks.map((l) => l.ownerPlayerId),
     ...linkedLinks.flatMap((l) => (l.linkedPlayerId != null ? [l.linkedPlayerId] : [])),
   ]);
+  const acceptedSessionPlayerIds = new Set<number>(
+    acceptedSessionsForPlayers.map((a) => a.sessionPlayerId)
+  );
 
-  const totalInvites = session.invites.length;
-  const acceptedInvites = session.invites.filter((i) => i.status === "ACCEPTED").length;
+  const totalInvites = inviteBySessionPlayerId.size;
+  const acceptedInvites = [...inviteBySessionPlayerId.keys()].filter(
+    (spId) => acceptedSessionPlayerIds.has(spId)
+  ).length;
 
   const playersWithResults = session.players.filter(
     (sp) => sp.buyIn !== null && sp.cashOut !== null
@@ -152,16 +163,44 @@ export default async function SessionDetailPage({ params }: PageProps) {
                 {playersWithResults.map((sp) => {
                   const isLinked = linkedPlayerIds.has(sp.playerId);
                   const inviteStatus = inviteBySessionPlayerId.get(sp.id);
+                  const hasAcceptedSession = acceptedSessionPlayerIds.has(sp.id);
+
+                  // Priority: 1=unlinked, 2=pending invite, 3=has accepted session, 4=no invite, 5=prev accepted/rejected
+                  const showPending = isLinked && inviteStatus === "PENDING";
+                  const showAcceptedSession = isLinked && !showPending && hasAcceptedSession;
+                  const showShareButton = isLinked && !showPending && !hasAcceptedSession;
+                  const reshare = showShareButton && (inviteStatus === "ACCEPTED" || inviteStatus === "REJECTED");
+
                   return (
                     <tr key={sp.id} className="bg-zinc-950">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-zinc-100">{sp.player.name}</span>
-                          {(isLinked || inviteStatus) && (
+                          {showAcceptedSession && (
+                            <span title="Has an active copy of this session" className="inline-flex items-center rounded-full border border-emerald-800 bg-emerald-950 p-1 text-emerald-400">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3"><polyline points="20 6 9 17 4 12" /></svg>
+                            </span>
+                          )}
+                          {showPending && (
+                            <span title="Invite sent — waiting for them to accept" className="inline-flex items-center rounded-full border border-amber-700 bg-amber-950 p-1 text-amber-400">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                            </span>
+                          )}
+                          {reshare && inviteStatus === "ACCEPTED" && (
+                            <span title="Previously accepted but no longer has this session" className="inline-flex items-center rounded-full border border-zinc-600 bg-zinc-800 p-1 text-zinc-400">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3"><polyline points="20 6 9 17 4 12" /></svg>
+                            </span>
+                          )}
+                          {reshare && inviteStatus === "REJECTED" && (
+                            <span title="Previously declined this invite" className="inline-flex items-center rounded-full border border-red-800 bg-red-950 p-1 text-red-400">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </span>
+                          )}
+                          {showShareButton && (
                             <SharePlayerButton
                               sessionId={session.id}
                               sessionPlayerId={sp.id}
-                              initialStatus={inviteStatus ?? null}
+                              reshare={reshare}
                             />
                           )}
                         </div>
