@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import PageWrapper from "@/components/layout/PageWrapper";
 import GroupSessionsView from "@/components/breakdowns/GroupSessionsView";
-import { serializeSession } from "@/lib/sessionUtils";
+import { fetchAllForUser } from "@/lib/unified-session";
 
 export const dynamic = "force-dynamic";
 
@@ -10,22 +10,11 @@ export default async function GroupSessionsPage() {
   const session = await auth();
   const userId = Number(session!.user!.id);
 
-  const [rawSessions, rawPlayers, rawGroups] = await Promise.all([
-    prisma.session.findMany({
-      where: { userId },
-      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
-      include: {
-        players: {
-          include: { player: { select: { name: true } } },
-          orderBy: { player: { name: "asc" } },
-        },
-      },
-    }),
+  const [sessions, rawPlayers, rawGroups] = await Promise.all([
+    fetchAllForUser(userId),
     prisma.player.findMany({ where: { userId } }),
     prisma.playerGroup.findMany({ where: { userId }, orderBy: { name: "asc" } }),
   ]);
-
-  const sessions = rawSessions.map(serializeSession);
   const playerGroupMap = Object.fromEntries(
     rawPlayers
       .filter((p) => p.groupId !== null)

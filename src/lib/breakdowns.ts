@@ -1,6 +1,5 @@
 import type {
-  SessionWithPlayers,
-  SessionPlayerDetail,
+  UnifiedSession,
   PlayerBreakdownRow,
   GroupBreakdownRow,
   PlayerGroup,
@@ -27,7 +26,7 @@ interface PlayerMeta {
 }
 
 function buildRow(
-  sessions: SessionWithPlayers[]
+  sessions: UnifiedSession[]
 ): Omit<PlayerBreakdownRow | GroupBreakdownRow, "playerId" | "groupId" | "name" | "color" | "group"> {
   const profits = sessions.map((s) => s.profit);
   const totalBuyIn = sessions.reduce((sum, s) => sum + s.buyIn, 0);
@@ -46,18 +45,19 @@ function buildRow(
  * Used by both buildPlayerBreakdowns and computeBreakdownStats.
  */
 export function getSessionsPerPlayer(
-  sessions: SessionWithPlayers[],
+  sessions: UnifiedSession[],
   minSessions = 3
-): Map<number, SessionWithPlayers[]> {
-  const map = new Map<number, SessionWithPlayers[]>();
+): Map<number, UnifiedSession[]> {
+  const map = new Map<number, UnifiedSession[]>();
 
   for (const session of sessions) {
     for (const sp of session.players) {
-      const existing = map.get(sp.playerId);
+      if (sp.isMe) continue;
+      const existing = map.get(sp.playerId!);
       if (existing) {
         existing.push(session);
       } else {
-        map.set(sp.playerId, [session]);
+        map.set(sp.playerId!, [session]);
       }
     }
   }
@@ -78,7 +78,7 @@ export type SessionGroupLabel = { id: number | null; name: string; color: string
  * Mirrors the per-session logic inside getSessionsPerGroup.
  */
 export function getSessionPredominantGroups(
-  players: SessionPlayerDetail[]
+  players: ReadonlyArray<{ group?: { id: number; name: string; color: string } | null }>
 ): SessionGroupLabel[] {
   if (players.length === 0) return [];
 
@@ -119,20 +119,21 @@ export function getSessionPredominantGroups(
  * Used by both buildGroupBreakdowns and computeBreakdownStats.
  */
 export function getSessionsPerGroup(
-  sessions: SessionWithPlayers[],
+  sessions: UnifiedSession[],
   playerGroupMap: Map<number, number> // playerId → groupId
-): Map<number, SessionWithPlayers[]> {
-  const map = new Map<number, SessionWithPlayers[]>();
-  const ungroupedSessions: SessionWithPlayers[] = [];
+): Map<number, UnifiedSession[]> {
+  const map = new Map<number, UnifiedSession[]>();
+  const ungroupedSessions: UnifiedSession[] = [];
 
   for (const session of sessions) {
-    const totalPlayers = session.players.length;
+    const opponents = session.players.filter((p) => !p.isMe);
+    const totalPlayers = opponents.length;
     if (totalPlayers === 0) continue;
 
     let playersWithAnyGroup = 0;
     const groupCounts = new Map<number, number>();
-    for (const sp of session.players) {
-      const gid = playerGroupMap.get(sp.playerId);
+    for (const sp of opponents) {
+      const gid = playerGroupMap.get(sp.playerId!);
       if (gid !== undefined) {
         playersWithAnyGroup += 1;
         groupCounts.set(gid, (groupCounts.get(gid) ?? 0) + 1);
@@ -170,7 +171,7 @@ export function getSessionsPerGroup(
  * A session is included in a player's row if that player appeared in the session.
  */
 export function buildPlayerBreakdowns(
-  sessions: SessionWithPlayers[],
+  sessions: UnifiedSession[],
   playerMetas: Map<number, PlayerMeta>
 ): PlayerBreakdownRow[] {
   const map = getSessionsPerPlayer(sessions);
@@ -194,12 +195,12 @@ export function buildPlayerBreakdowns(
  * Used by the Group Sessions Explorer (as opposed to the ≥50% majority rule).
  */
 export function getSessionsForGroup(
-  sessions: SessionWithPlayers[],
+  sessions: UnifiedSession[],
   groupId: number,
   playerGroupMap: Map<number, number>,
-): SessionWithPlayers[] {
+): UnifiedSession[] {
   return sessions.filter((s) =>
-    s.players.some((sp) => playerGroupMap.get(sp.playerId) === groupId)
+    s.players.some((sp) => !sp.isMe && playerGroupMap.get(sp.playerId!) === groupId)
   );
 }
 
@@ -223,7 +224,7 @@ export interface GroupSessionPlayerRow {
  * Opponent numeric fields are null when no data has been recorded.
  */
 export function buildGroupSessionPlayerRows(
-  filteredSessions: SessionWithPlayers[],
+  filteredSessions: UnifiedSession[],
   groupId: number,
   playerGroupMap: Map<number, number>,
   extraPlayerIds: Set<number> = new Set(),
@@ -258,15 +259,16 @@ export function buildGroupSessionPlayerRows(
 
   for (const session of filteredSessions) {
     for (const sp of session.players) {
-      if (playerGroupMap.get(sp.playerId) !== groupId && !extraPlayerIds.has(sp.playerId)) continue;
-      const existing = opponentMap.get(sp.playerId);
+      if (sp.isMe) continue;
+      if (playerGroupMap.get(sp.playerId!) !== groupId && !extraPlayerIds.has(sp.playerId!)) continue;
+      const existing = opponentMap.get(sp.playerId!);
       if (existing) {
         existing.appearances++;
         if (sp.buyIn !== null) existing.buyIns.push(sp.buyIn);
         if (sp.cashOut !== null) existing.cashOuts.push(sp.cashOut);
         if (sp.profit !== null) existing.profits.push(sp.profit);
       } else {
-        opponentMap.set(sp.playerId, {
+        opponentMap.set(sp.playerId!, {
           name: sp.playerName,
           appearances: 1,
           buyIns: sp.buyIn !== null ? [sp.buyIn] : [],
@@ -305,7 +307,7 @@ export function buildGroupSessionPlayerRows(
  * and player metadata for rendering lines.
  */
 export function buildCumulativeByPlayer(
-  filteredSessions: SessionWithPlayers[],
+  filteredSessions: UnifiedSession[],
   groupId: number,
   playerGroupMap: Map<number, number>,
   extraPlayerIds: Set<number> = new Set(),
@@ -321,7 +323,8 @@ export function buildCumulativeByPlayer(
 
   for (const session of filteredSessions) {
     for (const sp of session.players) {
-      if (playerGroupMap.get(sp.playerId) !== groupId && !extraPlayerIds.has(sp.playerId)) continue;
+      if (sp.isMe) continue;
+      if (playerGroupMap.get(sp.playerId!) !== groupId && !extraPlayerIds.has(sp.playerId!)) continue;
       const key = `player_${sp.playerId}`;
       if (!nameMap.has(key)) {
         allKeys.push(key);
@@ -381,7 +384,7 @@ export function buildCumulativeByPlayer(
  * Builds per-session detail rows for the Group Sessions Explorer side table.
  */
 export function buildGroupSessionDetails(
-  filteredSessions: SessionWithPlayers[],
+  filteredSessions: UnifiedSession[],
   groupId: number,
   playerGroupMap: Map<number, number>,
   extraPlayerIds: Set<number> = new Set(),
@@ -390,25 +393,22 @@ export function buildGroupSessionDetails(
     const isGroupMember = (playerId: number) =>
       playerGroupMap.get(playerId) === groupId || extraPlayerIds.has(playerId);
 
-    const nonGroupPlayers = session.players.filter(
-      (sp) => !isGroupMember(sp.playerId)
-    ).length;
+    const opponents = session.players.filter((sp) => !sp.isMe);
+    const nonGroupPlayers = opponents.filter((sp) => !isGroupMember(sp.playerId!)).length;
 
-    const totalOnTable =
-      session.buyIn +
-      session.players.reduce((sum, sp) => sum + (sp.buyIn ?? 0), 0);
+    const totalOnTable = session.players
+      .filter((p) => p.buyIn !== null)
+      .reduce((sum, p) => sum + p.buyIn!, 0);
 
-    const groupNetRaw =
-      session.profit +
-      session.players
-        .filter((sp) => isGroupMember(sp.playerId) && sp.profit !== null)
-        .reduce((sum, sp) => sum + (sp.profit ?? 0), 0);
+    const groupNetRaw = session.players
+      .filter((p) => p.profit !== null && (p.isMe || (p.playerId !== null && isGroupMember(p.playerId))))
+      .reduce((sum, p) => sum + p.profit!, 0);
     const groupNet = Math.round(groupNetRaw * 100) / 100;
 
     return {
       sessionId: session.id,
       date: session.date,
-      totalPlayers: session.players.length + 1,
+      totalPlayers: session.players.length,
       nonGroupPlayers,
       totalOnTable,
       groupNet,
@@ -422,7 +422,7 @@ export function buildGroupSessionDetails(
  * in that session belong to that group.
  */
 export function buildGroupBreakdowns(
-  sessions: SessionWithPlayers[],
+  sessions: UnifiedSession[],
   groups: PlayerGroup[],
   playerGroupMap: Map<number, number> // playerId → groupId
 ): GroupBreakdownRow[] {

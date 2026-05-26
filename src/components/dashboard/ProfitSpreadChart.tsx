@@ -13,7 +13,7 @@ import {
   useYAxisScale,
 } from "recharts";
 import { useFormatCurrency } from "@/contexts/SettingsContext";
-import type { SessionWithPlayers } from "@/types";
+import type { UnifiedSession } from "@/types";
 
 interface BoxStat {
   label: string;
@@ -50,7 +50,7 @@ function niceTicks(min: number, max: number, targetCount = 5): number[] {
   return ticks;
 }
 
-function buildBoxData(sessions: SessionWithPlayers[], formatCurrency: (v: number) => string): BoxStat[] {
+function buildBoxData(sessions: UnifiedSession[], formatCurrency: (v: number) => string): BoxStat[] {
   const groups = new Map<number, number[]>();
   for (const s of sessions) {
     const existing = groups.get(s.buyIn) ?? [];
@@ -180,7 +180,7 @@ function BoxTooltip({
   );
 }
 
-export default function ProfitSpreadChart({ sessions }: { sessions: SessionWithPlayers[] }) {
+export default function ProfitSpreadChart({ sessions }: { sessions: UnifiedSession[] }) {
   const { formatCurrency } = useFormatCurrency();
   const boxData = buildBoxData(sessions, formatCurrency);
 

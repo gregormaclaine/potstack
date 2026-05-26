@@ -4,10 +4,10 @@ import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import { formatDate } from "@/lib/formatters";
 import { useFormatCurrency } from "@/contexts/SettingsContext";
-import type { SessionWithPlayers } from "@/types";
+import type { UnifiedSession } from "@/types";
 
 interface SessionBreakdownTableProps {
-  sessions: SessionWithPlayers[];
+  sessions: UnifiedSession[];
 }
 
 export default function SessionBreakdownTable({ sessions }: SessionBreakdownTableProps) {

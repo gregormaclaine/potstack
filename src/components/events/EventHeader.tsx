@@ -5,11 +5,11 @@ import clsx from "clsx";
 import { getEventColor } from "./eventColors";
 import { formatDate } from "@/lib/formatters";
 import { useFormatCurrency } from "@/contexts/SettingsContext";
-import type { PokerEvent, SessionWithPlayers } from "@/types";
+import type { PokerEvent, UnifiedSession } from "@/types";
 
 interface EventHeaderProps {
   event: PokerEvent;
-  sessions: SessionWithPlayers[];
+  sessions: UnifiedSession[];
   onEdit: (event: PokerEvent) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;

@@ -3,8 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import PageWrapper from "@/components/layout/PageWrapper";
 import SessionsView from "@/components/sessions/SessionsView";
-import { serializeSession } from "@/lib/sessionUtils";
-import type { SessionWithPlayers, AcceptedSessionRef, PokerEvent } from "@/types";
+import type { UnifiedSession, PokerEvent } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -50,8 +49,19 @@ export default async function SessionsPage({ searchParams }: PageProps) {
             date: true,
             location: true,
             notes: true,
+            buyIn: true,
+            cashOut: true,
+            profit: true,
             user: { select: { username: true } },
-            _count: { select: { players: true } },
+            players: {
+              select: {
+                playerId: true,
+                buyIn: true,
+                cashOut: true,
+                profit: true,
+                player: { select: { name: true } },
+              },
+            },
           },
         },
         invite: {
@@ -73,26 +83,88 @@ export default async function SessionsPage({ searchParams }: PageProps) {
     }),
   ]);
 
-  const sessions: SessionWithPlayers[] = raw.map(serializeSession);
+  const owned: UnifiedSession[] = raw.map((s) => ({
+    id: s.id,
+    sessionId: s.id,
+    source: "owned",
+    date: s.date.toISOString(),
+    location: s.location,
+    notes: s.notes,
+    buyIn: s.buyIn,
+    cashOut: s.cashOut,
+    profit: s.profit,
+    createdAt: s.createdAt.toISOString(),
+    updatedAt: s.updatedAt.toISOString(),
+    inviterUsername: null,
+    players: [
+      {
+        playerId: null,
+        playerName: "You",
+        group: null,
+        buyIn: s.buyIn,
+        cashOut: s.cashOut,
+        profit: s.profit,
+        isMe: true as const,
+        linkedUsername: null,
+        resolvedVia: null,
+      },
+      ...s.players.map((sp) => ({
+        playerId: sp.playerId,
+        playerName: sp.player.name,
+        group: sp.player.group ?? null,
+        buyIn: sp.buyIn,
+        cashOut: sp.cashOut,
+        profit: sp.profit,
+        isMe: false as const,
+        linkedUsername: null,
+        resolvedVia: null,
+      })),
+    ],
+  }));
 
-  const acceptedSessions: AcceptedSessionRef[] = rawAccepted.map((a) => {
+  const accepted: UnifiedSession[] = rawAccepted.map((a) => {
     const sp = a.invite.sessionPlayer;
     const src = a.invite.session;
+    const myBuyIn = sp?.buyIn ?? src.buyIn;
+    const myCashOut = sp?.cashOut ?? src.cashOut;
+    const myProfit = sp?.profit ?? src.profit;
     return {
       id: a.id,
       sessionId: a.sessionId,
+      source: "accepted",
       date: a.session.date.toISOString(),
-      location: a.session.location,
-      localLocation: a.localLocation,
-      notes: a.session.notes,
-      localNotes: a.localNotes,
-      inviterUsername: a.session.user.username,
-      myBuyIn: sp.buyIn ?? src.buyIn,
-      myCashOut: sp.cashOut ?? src.cashOut,
-      myProfit: sp.profit ?? src.profit,
-      playerCount: a.session._count.players,
+      location: a.localLocation ?? a.session.location,
+      notes: a.localNotes ?? a.session.notes,
+      buyIn: myBuyIn,
+      cashOut: myCashOut,
+      profit: myProfit,
       createdAt: a.createdAt.toISOString(),
       updatedAt: a.updatedAt.toISOString(),
+      inviterUsername: a.session.user.username,
+      players: [
+        {
+          playerId: null,
+          playerName: "You",
+          group: null,
+          buyIn: myBuyIn,
+          cashOut: myCashOut,
+          profit: myProfit,
+          isMe: true as const,
+          linkedUsername: null,
+          resolvedVia: null,
+        },
+        ...a.session.players.map((p) => ({
+          playerId: p.playerId,
+          playerName: p.player.name,
+          group: null,
+          buyIn: p.buyIn,
+          cashOut: p.cashOut,
+          profit: p.profit,
+          isMe: false as const,
+          linkedUsername: null,
+          resolvedVia: null,
+        })),
+      ],
     };
   });
 
@@ -123,8 +195,7 @@ export default async function SessionsPage({ searchParams }: PageProps) {
         </Link>
       )}
       <SessionsView
-        sessions={sessions}
-        acceptedSessions={acceptedSessions}
+        sessions={[...owned, ...accepted]}
         initialEvents={events}
         total={total}
         page={page}

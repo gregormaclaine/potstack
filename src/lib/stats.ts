@@ -1,10 +1,10 @@
-import type { SessionWithPlayers, DashboardStats, TopPlayer, PokerEvent } from "@/types";
+import type { UnifiedSession, DashboardStats, TopPlayer, PokerEvent } from "@/types";
 import type { Timeline } from "@/components/dashboard/TimelineSelector";
 
 export function filterSessionsByEvent(
-  sessions: SessionWithPlayers[],
+  sessions: UnifiedSession[],
   event: PokerEvent
-): SessionWithPlayers[] {
+): UnifiedSession[] {
   const start = new Date(event.startDate);
   const end = new Date(event.endDate);
   start.setHours(0, 0, 0, 0);
@@ -16,9 +16,9 @@ export function filterSessionsByEvent(
 }
 
 export function filterSessionsByTimeline(
-  sessions: SessionWithPlayers[],
+  sessions: UnifiedSession[],
   timeline: Timeline
-): SessionWithPlayers[] {
+): UnifiedSession[] {
   if (timeline === "all") return sessions;
 
   const now = new Date();
@@ -42,7 +42,7 @@ export function filterSessionsByTimeline(
 }
 
 export function buildDashboardStats(
-  sessions: SessionWithPlayers[]
+  sessions: UnifiedSession[]
 ): DashboardStats {
   const sorted = [...sessions].sort((a, b) => {
     const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
@@ -98,14 +98,15 @@ export function buildDashboardStats(
   >();
   for (const session of sorted) {
     for (const sp of session.players) {
-      const existing = playerMap.get(sp.playerId);
+      if (sp.isMe) continue;
+      const existing = playerMap.get(sp.playerId!);
       if (existing) {
         existing.sessions += 1;
         if (sp.profit !== null) {
           existing.totalProfit = (existing.totalProfit ?? 0) + sp.profit;
         }
       } else {
-        playerMap.set(sp.playerId, {
+        playerMap.set(sp.playerId!, {
           name: sp.playerName,
           sessions: 1,
           totalProfit: sp.profit !== null ? sp.profit : null,
@@ -119,7 +120,7 @@ export function buildDashboardStats(
     .sort((a, b) => b.sessions - a.sessions)
     .slice(0, 5);
 
-  const recentSessions = [...sorted].reverse().filter((s) => !s.isAcceptedRef).slice(0, 5);
+  const recentSessions = [...sorted].reverse().filter((s) => s.source === "owned").slice(0, 5);
 
   return {
     totalSessions,

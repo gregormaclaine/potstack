@@ -71,6 +71,37 @@ export interface SessionWithPlayers {
   isAcceptedRef?: true;
 }
 
+export interface UnifiedSessionPlayer {
+  playerId: number | null;
+  playerName: string;
+  group?: { id: number; name: string; color: string } | null;
+  buyIn: number | null;
+  cashOut: number | null;
+  profit: number | null;
+  /** Non-null if this player is linked to another app user account. */
+  linkedUsername: string | null;
+  /** How the player was resolved to this user's records; null for owned sessions. */
+  resolvedVia: 'playerLink' | 'equivalence' | null;
+  isInviter: boolean;
+}
+
+export interface UnifiedSession {
+  /** Primary key of the underlying record: Session.id for owned, AcceptedSession.id for accepted. */
+  id: number;
+  /** Always Session.id — use this for lookups against the sessions table. */
+  sessionId: number;
+  source: 'owned' | 'accepted';
+  date: string;
+  location: string | null;
+  notes: string | null;
+  buyIn: number;
+  cashOut: number;
+  profit: number;
+  createdAt: string;
+  updatedAt: string;
+  players: UnifiedSessionPlayer[];
+}
+
 export interface ProfitOverTimePoint {
   date: string;
   sessionProfit: number;
@@ -100,10 +131,10 @@ export interface DashboardStats {
   profitOverTime: ProfitOverTimePoint[];
   winLossPerSession: WinLossPoint[];
   topPlayers: TopPlayer[];
-  recentSessions: SessionWithPlayers[];
+  recentSessions: UnifiedSession[];
 }
 
-export type LinkStatus = "PENDING" | "ACCEPTED" | "REJECTED";
+export type LinkStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
 
 export interface PlayerLinkSummary {
   id: number;
@@ -134,7 +165,7 @@ export interface SessionInviteItem {
 }
 
 export interface BreakdownStatsItem {
-  entityType: "player" | "group";
+  entityType: 'player' | 'group';
   entityId: number;
   winRateCILow: number;
   winRateCIHigh: number;
@@ -170,29 +201,29 @@ export interface AcceptedSessionPlayer {
   cashOut: number | null;
   profit: number | null;
   isMe: boolean;
-  resolvedVia: "playerLink" | "equivalence" | null;
+  resolvedVia: 'playerLink' | 'equivalence' | null;
   linkedUsername: string | null;
 }
 
 // ── Notification system ───────────────────────────────────────────────────────
 
 export type NotificationType =
-  | "link_request_received"
-  | "link_accepted"
-  | "link_rejected_sent"       // shown to the requester whose request was rejected
-  | "link_rejected_received"   // shown to the person who did the rejecting
-  | "link_broken"
-  | "session_invite_received"
-  | "session_invite_accepted"          // shown to session owner
-  | "session_invite_accepted_by_me"    // shown to the invitee who accepted
-  | "session_invite_rejected"          // shown to session owner
-  | "session_invite_rejected_by_me";   // shown to the invitee who rejected
+  | 'link_request_received'
+  | 'link_accepted'
+  | 'link_rejected_sent' // shown to the requester whose request was rejected
+  | 'link_rejected_received' // shown to the person who did the rejecting
+  | 'link_broken'
+  | 'session_invite_received'
+  | 'session_invite_accepted' // shown to session owner
+  | 'session_invite_accepted_by_me' // shown to the invitee who accepted
+  | 'session_invite_rejected' // shown to session owner
+  | 'session_invite_rejected_by_me'; // shown to the invitee who rejected
 
-export type LinkRequestReceivedData   = { requesterUsername: string; playerName: string };
-export type LinkAcceptedData          = { otherUsername: string; myPlayerName: string };
-export type LinkRejectedSentData      = { otherUsername: string; playerName: string };
-export type LinkRejectedReceivedData  = { otherUsername: string; playerName: string };
-export type LinkBrokenData            = { otherUsername: string; myPlayerName: string; theirPlayerName: string };
+export type LinkRequestReceivedData = { requesterUsername: string; playerName: string };
+export type LinkAcceptedData = { otherUsername: string; myPlayerName: string };
+export type LinkRejectedSentData = { otherUsername: string; playerName: string };
+export type LinkRejectedReceivedData = { otherUsername: string; playerName: string };
+export type LinkBrokenData = { otherUsername: string; myPlayerName: string; theirPlayerName: string };
 
 export type SessionInviteReceivedData = {
   inviterUsername: string;
@@ -202,22 +233,39 @@ export type SessionInviteReceivedData = {
   cashOut: number | null;
   profit: number | null;
 };
-export type SessionInviteAcceptedData       = { otherUsername: string; sessionDate: string; sessionLocation: string | null };
-export type SessionInviteAcceptedByMeData   = { otherUsername: string; sessionDate: string; sessionLocation: string | null; acceptedSessionId: number };
-export type SessionInviteRejectedData       = { otherUsername: string; sessionDate: string; sessionLocation: string | null };
-export type SessionInviteRejectedByMeData   = { otherUsername: string; sessionDate: string; sessionLocation: string | null };
+export type SessionInviteAcceptedData = {
+  otherUsername: string;
+  sessionDate: string;
+  sessionLocation: string | null;
+};
+export type SessionInviteAcceptedByMeData = {
+  otherUsername: string;
+  sessionDate: string;
+  sessionLocation: string | null;
+  acceptedSessionId: number;
+};
+export type SessionInviteRejectedData = {
+  otherUsername: string;
+  sessionDate: string;
+  sessionLocation: string | null;
+};
+export type SessionInviteRejectedByMeData = {
+  otherUsername: string;
+  sessionDate: string;
+  sessionLocation: string | null;
+};
 
 export type NotificationData =
-  | ({ type: "link_request_received" }         & LinkRequestReceivedData)
-  | ({ type: "link_accepted" }                 & LinkAcceptedData)
-  | ({ type: "link_rejected_sent" }            & LinkRejectedSentData)
-  | ({ type: "link_rejected_received" }        & LinkRejectedReceivedData)
-  | ({ type: "link_broken" }                   & LinkBrokenData)
-  | ({ type: "session_invite_received" }       & SessionInviteReceivedData)
-  | ({ type: "session_invite_accepted" }       & SessionInviteAcceptedData)
-  | ({ type: "session_invite_accepted_by_me" } & SessionInviteAcceptedByMeData)
-  | ({ type: "session_invite_rejected" }       & SessionInviteRejectedData)
-  | ({ type: "session_invite_rejected_by_me" } & SessionInviteRejectedByMeData);
+  | ({ type: 'link_request_received' } & LinkRequestReceivedData)
+  | ({ type: 'link_accepted' } & LinkAcceptedData)
+  | ({ type: 'link_rejected_sent' } & LinkRejectedSentData)
+  | ({ type: 'link_rejected_received' } & LinkRejectedReceivedData)
+  | ({ type: 'link_broken' } & LinkBrokenData)
+  | ({ type: 'session_invite_received' } & SessionInviteReceivedData)
+  | ({ type: 'session_invite_accepted' } & SessionInviteAcceptedData)
+  | ({ type: 'session_invite_accepted_by_me' } & SessionInviteAcceptedByMeData)
+  | ({ type: 'session_invite_rejected' } & SessionInviteRejectedData)
+  | ({ type: 'session_invite_rejected_by_me' } & SessionInviteRejectedByMeData);
 
 export interface CumulativePlayerPoint {
   sessionIndex: number;
@@ -226,18 +274,18 @@ export interface CumulativePlayerPoint {
 }
 
 export interface CumulativePlayerMeta {
-  key: string;    // "me" or "player_42"
-  name: string;   // display name
-  color: string;  // hex color e.g. "#10b981"
+  key: string; // "me" or "player_42"
+  name: string; // display name
+  color: string; // hex color e.g. "#10b981"
 }
 
 export interface GroupSessionDetail {
   sessionId: number;
   date: string;
-  totalPlayers: number;    // all players including user
+  totalPlayers: number; // all players including user
   nonGroupPlayers: number; // opponents NOT in the selected group
-  totalOnTable: number;    // sum of all known buy-ins (user + non-null opponent buy-ins)
-  groupNet: number;        // sum of user profit + known group-member opponent profits
+  totalOnTable: number; // sum of all known buy-ins (user + non-null opponent buy-ins)
+  groupNet: number; // sum of user profit + known group-member opponent profits
 }
 
 /** A fully-fetched notification row ready for the frontend. */
@@ -249,10 +297,10 @@ export interface NotificationRow {
   data: NotificationData;
   // FK ids — null means the record was deleted
   sessionId: number | null;
-  linkId:    number | null;
-  inviteId:  number | null;
+  linkId: number | null;
+  inviteId: number | null;
   // Live FK status — null means the record was deleted
-  link:   { status: string } | null;
+  link: { status: string } | null;
   invite: { status: string } | null;
 }
 

@@ -4,8 +4,8 @@ import PageWrapper from "@/components/layout/PageWrapper";
 import BreakdownStatsView from "@/components/breakdowns/stats/BreakdownStatsView";
 import StatsPageGuard from "@/components/breakdowns/stats/StatsPageGuard";
 import { buildPlayerBreakdowns, buildGroupBreakdowns } from "@/lib/breakdowns";
-import { serializeSession } from "@/lib/sessionUtils";
-import type { SessionWithPlayers, PlayerGroup, PlayerBreakdownRow, GroupBreakdownRow, BreakdownStatsItem } from "@/types";
+import { fetchAllForUser } from "@/lib/unified-session";
+import type { PlayerGroup, PlayerBreakdownRow, GroupBreakdownRow, BreakdownStatsItem } from "@/types";
 
 type RawPlayer = { id: number; name: string; groupId: number | null; group: PlayerGroup | null };
 
@@ -15,17 +15,8 @@ export default async function BreakdownStatsPage() {
   const session = await auth();
   const userId = Number(session!.user!.id);
 
-  const [rawSessions, rawPlayers, rawGroups, rawStats, user] = await Promise.all([
-    prisma.session.findMany({
-      where: { userId },
-      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
-      include: {
-        players: {
-          include: { player: { select: { name: true } } },
-          orderBy: { player: { name: "asc" } },
-        },
-      },
-    }),
+  const [sessions, rawPlayers, rawGroups, rawStats, user] = await Promise.all([
+    fetchAllForUser(userId),
     prisma.player.findMany({
       where: { userId },
       include: { group: true },
@@ -40,8 +31,6 @@ export default async function BreakdownStatsPage() {
       select: { breakdownLastRefreshedAt: true },
     }),
   ]);
-
-  const sessions: SessionWithPlayers[] = rawSessions.map(serializeSession);
 
   const playerMetas = new Map(
     rawPlayers.map((p: RawPlayer) => [p.id, { name: p.name, group: p.group }])

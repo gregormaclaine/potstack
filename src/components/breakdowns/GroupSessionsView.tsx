@@ -16,7 +16,7 @@ import {
 } from "@/lib/breakdowns";
 import { formatPercent, formatDate } from "@/lib/formatters";
 import { useFormatCurrency } from "@/contexts/SettingsContext";
-import type { SessionWithPlayers, PlayerGroup } from "@/types";
+import type { UnifiedSession, PlayerGroup } from "@/types";
 
 type SortKey =
   | "name"
@@ -57,7 +57,7 @@ function persistSavedSearches(searches: SavedGroupSearch[]): void {
 }
 
 interface GroupSessionsViewProps {
-  sessions: SessionWithPlayers[];
+  sessions: UnifiedSession[];
   playerGroupMap: Record<number, number>;
   groups: PlayerGroup[];
   players: { id: number; name: string; groupId: number | null }[];
@@ -162,8 +162,9 @@ export default function GroupSessionsView({
     return dateFilteredSessions.filter((s) =>
       s.players.every(
         (sp) =>
-          playerGroupMapObj.get(sp.playerId) === selectedGroupId ||
-          extraPlayerIdSet.has(sp.playerId)
+          sp.isMe ||
+          playerGroupMapObj.get(sp.playerId!) === selectedGroupId ||
+          extraPlayerIdSet.has(sp.playerId!)
       )
     );
   }, [dateFilteredSessions, strictMode, selectedGroupId, playerGroupMapObj, extraPlayerIdSet]);

@@ -11,7 +11,7 @@ import type {
   ProfitOverTimePoint,
   WinLossPoint,
   TopPlayer,
-  SessionWithPlayers,
+  UnifiedSession,
 } from "@/types";
 
 // ── Dummy data ──────────────────────────────────────────────────────────────
@@ -53,167 +53,69 @@ const topPlayers: TopPlayer[] = [
   { playerId: 5, name: "Taylor", sessions: 7, totalProfit: null },
 ];
 
-const recentSessions: SessionWithPlayers[] = [
+function player(playerId: number, playerName: string, buyIn: number, cashOut: number, profit: number) {
+  return { playerId, playerName, group: null, buyIn, cashOut, profit, isMe: false as const, linkedUsername: null, resolvedVia: null };
+}
+
+const recentSessions: UnifiedSession[] = [
   {
-    id: 1,
-    date: "2025-12-15T00:00:00.000Z",
-    location: "Home Game",
-    notes: null,
-    buyIn: 50,
-    cashOut: 230,
-    profit: 180,
-    createdAt: "2025-12-15T20:00:00.000Z",
-    updatedAt: "2025-12-15T20:00:00.000Z",
+    id: 1, sessionId: 1, source: "owned", inviterUsername: null,
+    date: "2025-12-15T00:00:00.000Z", location: "Home Game", notes: null,
+    buyIn: 50, cashOut: 230, profit: 180,
+    createdAt: "2025-12-15T20:00:00.000Z", updatedAt: "2025-12-15T20:00:00.000Z",
     players: [
-      {
-        id: 1,
-        playerId: 1,
-        playerName: "Jamie",
-        buyIn: 50,
-        cashOut: 10,
-        profit: -40,
-      },
-      {
-        id: 2,
-        playerId: 2,
-        playerName: "Sam",
-        buyIn: 50,
-        cashOut: 60,
-        profit: 10,
-      },
-      {
-        id: 3,
-        playerId: 3,
-        playerName: "Alex",
-        buyIn: 50,
-        cashOut: 80,
-        profit: 30,
-      },
+      player(1, "Jamie", 50, 10, -40),
+      player(2, "Sam", 50, 60, 10),
+      player(3, "Alex", 50, 80, 30),
     ],
   },
   {
-    id: 2,
-    date: "2025-12-08T00:00:00.000Z",
-    location: "Casino",
-    notes: null,
-    buyIn: 100,
-    cashOut: 5,
-    profit: -95,
-    createdAt: "2025-12-08T22:00:00.000Z",
-    updatedAt: "2025-12-08T22:00:00.000Z",
+    id: 2, sessionId: 2, source: "owned", inviterUsername: null,
+    date: "2025-12-08T00:00:00.000Z", location: "Casino", notes: null,
+    buyIn: 100, cashOut: 5, profit: -95,
+    createdAt: "2025-12-08T22:00:00.000Z", updatedAt: "2025-12-08T22:00:00.000Z",
+    players: [player(4, "Morgan", 100, 150, 50)],
+  },
+  {
+    id: 3, sessionId: 3, source: "owned", inviterUsername: null,
+    date: "2025-12-01T00:00:00.000Z", location: "Home Game", notes: null,
+    buyIn: 50, cashOut: 330, profit: 280,
+    createdAt: "2025-12-01T21:30:00.000Z", updatedAt: "2025-12-01T21:30:00.000Z",
     players: [
-      {
-        id: 4,
-        playerId: 4,
-        playerName: "Morgan",
-        buyIn: 100,
-        cashOut: 150,
-        profit: 50,
-      },
+      player(1, "Jamie", 50, 20, -30),
+      player(5, "Taylor", 50, 0, -50),
     ],
   },
   {
-    id: 3,
-    date: "2025-12-01T00:00:00.000Z",
-    location: "Home Game",
-    notes: null,
-    buyIn: 50,
-    cashOut: 330,
-    profit: 280,
-    createdAt: "2025-12-01T21:30:00.000Z",
-    updatedAt: "2025-12-01T21:30:00.000Z",
-    players: [
-      {
-        id: 5,
-        playerId: 1,
-        playerName: "Jamie",
-        buyIn: 50,
-        cashOut: 20,
-        profit: -30,
-      },
-      {
-        id: 6,
-        playerId: 5,
-        playerName: "Taylor",
-        buyIn: 50,
-        cashOut: 0,
-        profit: -50,
-      },
-    ],
+    id: 4, sessionId: 4, source: "owned", inviterUsername: null,
+    date: "2025-11-24T00:00:00.000Z", location: "Pub Night", notes: null,
+    buyIn: 20, cashOut: -15, profit: -35,
+    createdAt: "2025-11-24T19:00:00.000Z", updatedAt: "2025-11-24T19:00:00.000Z",
+    players: [player(2, "Sam", 20, 55, 35)],
   },
   {
-    id: 4,
-    date: "2025-11-24T00:00:00.000Z",
-    location: "Pub Night",
-    notes: null,
-    buyIn: 20,
-    cashOut: -15,
-    profit: -35,
-    createdAt: "2025-11-24T19:00:00.000Z",
-    updatedAt: "2025-11-24T19:00:00.000Z",
+    id: 5, sessionId: 5, source: "owned", inviterUsername: null,
+    date: "2025-11-17T00:00:00.000Z", location: "Home Game", notes: null,
+    buyIn: 50, cashOut: 110, profit: 60,
+    createdAt: "2025-11-17T20:00:00.000Z", updatedAt: "2025-11-17T20:00:00.000Z",
     players: [
-      {
-        id: 7,
-        playerId: 2,
-        playerName: "Sam",
-        buyIn: 20,
-        cashOut: 55,
-        profit: 35,
-      },
-    ],
-  },
-  {
-    id: 5,
-    date: "2025-11-17T00:00:00.000Z",
-    location: "Home Game",
-    notes: null,
-    buyIn: 50,
-    cashOut: 110,
-    profit: 60,
-    createdAt: "2025-11-17T20:00:00.000Z",
-    updatedAt: "2025-11-17T20:00:00.000Z",
-    players: [
-      {
-        id: 8,
-        playerId: 3,
-        playerName: "Alex",
-        buyIn: 50,
-        cashOut: 40,
-        profit: -10,
-      },
-      {
-        id: 9,
-        playerId: 4,
-        playerName: "Morgan",
-        buyIn: 50,
-        cashOut: 60,
-        profit: 10,
-      },
+      player(3, "Alex", 50, 40, -10),
+      player(4, "Morgan", 50, 60, 10),
     ],
   },
 ];
 
-function s(
-  id: number,
-  date: string,
-  buyIn: number,
-  profit: number,
-): SessionWithPlayers {
+function s(id: number, date: string, buyIn: number, profit: number): UnifiedSession {
   return {
-    id,
-    date: `${date}T00:00:00.000Z`,
-    location: null,
-    notes: null,
-    buyIn,
-    cashOut: buyIn + profit,
-    profit,
-    createdAt: `${date}T20:00:00.000Z`,
-    updatedAt: `${date}T20:00:00.000Z`,
+    id, sessionId: id, source: "owned", inviterUsername: null,
+    date: `${date}T00:00:00.000Z`, location: null, notes: null,
+    buyIn, cashOut: buyIn + profit, profit,
+    createdAt: `${date}T20:00:00.000Z`, updatedAt: `${date}T20:00:00.000Z`,
     players: [],
   };
 }
 
-const spreadSessions: SessionWithPlayers[] = [
+const spreadSessions: UnifiedSession[] = [
   s(101, "2025-08-04", 20, 15),
   s(102, "2025-08-18", 20, -20),
   s(103, "2025-09-01", 20, 5),

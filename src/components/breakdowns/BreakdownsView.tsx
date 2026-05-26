@@ -12,7 +12,7 @@ import { buildPlayerBreakdowns, buildGroupBreakdowns } from "@/lib/breakdowns";
 import { formatPercent } from "@/lib/formatters";
 import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type {
-  SessionWithPlayers,
+  UnifiedSession,
   PlayerGroup,
   PlayerBreakdownRow,
   GroupBreakdownRow,
@@ -22,7 +22,7 @@ type SortKey = "name" | "sessions" | "totalBuyIn" | "totalCashOut" | "profit" | 
 type SortDir = "asc" | "desc";
 
 interface BreakdownsViewProps {
-  sessions: SessionWithPlayers[];
+  sessions: UnifiedSession[];
   playerMetas: Record<number, { name: string; group: PlayerGroup | null }>;
   playerGroupMap: Record<number, number>;
   groups: PlayerGroup[];

@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionsPerPlayer, getSessionsPerGroup } from "@/lib/breakdowns";
 import { bootstrapWinRateCI, probabilityOfProfit } from "@/lib/bootstrap";
-import { serializeSession } from "@/lib/sessionUtils";
-import type { SessionWithPlayers } from "@/types";
+import { fetchAllForUser } from "@/lib/unified-session";
 
 /**
  * Fetch all sessions + player/group data for a user, run bootstrap resampling
@@ -12,24 +11,13 @@ import type { SessionWithPlayers } from "@/types";
  * manual refresh to enforce the rate limit.
  */
 export async function computeAndSaveBreakdownStats(userId: number): Promise<void> {
-  const [rawSessions, rawPlayers] = await Promise.all([
-    prisma.session.findMany({
-      where: { userId },
-      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
-      include: {
-        players: {
-          include: { player: { select: { name: true } } },
-          orderBy: { player: { name: "asc" } },
-        },
-      },
-    }),
+  const [sessions, rawPlayers] = await Promise.all([
+    fetchAllForUser(userId),
     prisma.player.findMany({
       where: { userId },
       select: { id: true, groupId: true },
     }),
   ]);
-
-  const sessions: SessionWithPlayers[] = rawSessions.map(serializeSession);
 
   const playerGroupMap = new Map(
     rawPlayers

@@ -1,50 +1,26 @@
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
-import PageWrapper from "@/components/layout/PageWrapper";
-import BreakdownsView from "@/components/breakdowns/BreakdownsView";
-import { serializeSession } from "@/lib/sessionUtils";
-import type { SessionWithPlayers, PlayerGroup } from "@/types";
+import { prisma } from '@/lib/prisma';
+import { auth } from '@/auth';
+import PageWrapper from '@/components/layout/PageWrapper';
+import BreakdownsView from '@/components/breakdowns/BreakdownsView';
+import { fetchAllForUser } from '@/lib/unified-session';
 
-type RawPlayer = { id: number; name: string; groupId: number | null; group: PlayerGroup | null };
-
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 export default async function BreakdownsPage() {
   const session = await auth();
   const userId = Number(session!.user!.id);
 
-  const [rawSessions, rawPlayers, rawGroups] = await Promise.all([
-    prisma.session.findMany({
-      where: { userId },
-      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
-      include: {
-        players: {
-          include: { player: { select: { name: true } } },
-          orderBy: { player: { name: "asc" } },
-        },
-      },
-    }),
-    prisma.player.findMany({
-      where: { userId },
-      include: { group: true },
-    }),
-    prisma.playerGroup.findMany({
-      where: { userId },
-      orderBy: { name: "asc" },
-    }),
+  const [sessions, rawPlayers, rawGroups] = await Promise.all([
+    fetchAllForUser(userId),
+    prisma.player.findMany({ where: { userId }, include: { group: true } }),
+    prisma.playerGroup.findMany({ where: { userId }, orderBy: { name: 'asc' } }),
   ]);
 
-  const sessions: SessionWithPlayers[] = rawSessions.map(serializeSession);
-
-  const playerMetas = new Map(
-    rawPlayers.map((p: RawPlayer) => [p.id, { name: p.name, group: p.group }])
-  );
+  const playerMetas = new Map(rawPlayers.map(p => [p.id, { name: p.name, group: p.group }]));
 
   const playerGroupMap = new Map(
-    rawPlayers.filter((p: RawPlayer) => p.groupId !== null).map((p: RawPlayer) => [p.id, p.groupId as number])
+    rawPlayers.filter(p => p.groupId !== null).map(p => [p.id, p.groupId as number]),
   );
-
-  const groups: PlayerGroup[] = rawGroups;
 
   return (
     <PageWrapper>
@@ -52,7 +28,7 @@ export default async function BreakdownsPage() {
         sessions={sessions}
         playerMetas={Object.fromEntries(playerMetas)}
         playerGroupMap={Object.fromEntries(playerGroupMap)}
-        groups={groups}
+        groups={rawGroups}
       />
     </PageWrapper>
   );
