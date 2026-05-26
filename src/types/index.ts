@@ -67,6 +67,8 @@ export interface SessionWithPlayers {
   createdAt: string;
   updatedAt: string;
   players: SessionPlayerDetail[];
+  /** Present on accepted session references — excludes row from recentSessions and topPlayers */
+  isAcceptedRef?: true;
 }
 
 export interface ProfitOverTimePoint {
@@ -142,23 +144,34 @@ export interface BreakdownStatsItem {
   computedAt: string; // ISO string
 }
 
-export interface ResolvedPlayer {
-  fromPlayerId: number;
-  fromPlayerName: string;
-  toPlayerId: number;
-  toPlayerName: string;
+export interface AcceptedSessionRef {
+  id: number;
+  sessionId: number;
+  date: string;
+  location: string | null;
+  localLocation: string | null;
+  notes: string | null;
+  localNotes: string | null;
+  inviterUsername: string;
+  myBuyIn: number | null;
+  myCashOut: number | null;
+  myProfit: number | null;
+  playerCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface UnresolvedPlayer {
+export interface AcceptedSessionPlayer {
   fromPlayerId: number;
   fromPlayerName: string;
-}
-
-export interface PlayerMapping {
-  fromPlayerId: number;
-  toPlayerId?: number;
-  newPlayerName?: string;
-  // omitting both toPlayerId and newPlayerName means skip
+  toPlayerId: number | null;
+  toPlayerName: string | null;
+  buyIn: number | null;
+  cashOut: number | null;
+  profit: number | null;
+  isMe: boolean;
+  resolvedVia: "playerLink" | "equivalence" | null;
+  linkedUsername: string | null;
 }
 
 // ── Notification system ───────────────────────────────────────────────────────
@@ -190,7 +203,7 @@ export type SessionInviteReceivedData = {
   profit: number | null;
 };
 export type SessionInviteAcceptedData       = { otherUsername: string; sessionDate: string; sessionLocation: string | null };
-export type SessionInviteAcceptedByMeData   = { otherUsername: string; sessionDate: string; sessionLocation: string | null };
+export type SessionInviteAcceptedByMeData   = { otherUsername: string; sessionDate: string; sessionLocation: string | null; acceptedSessionId: number };
 export type SessionInviteRejectedData       = { otherUsername: string; sessionDate: string; sessionLocation: string | null };
 export type SessionInviteRejectedByMeData   = { otherUsername: string; sessionDate: string; sessionLocation: string | null };
 
@@ -225,13 +238,6 @@ export interface GroupSessionDetail {
   nonGroupPlayers: number; // opponents NOT in the selected group
   totalOnTable: number;    // sum of all known buy-ins (user + non-null opponent buy-ins)
   groupNet: number;        // sum of user profit + known group-member opponent profits
-}
-
-export interface DuplicateSessionInfo {
-  sessionId: number;
-  myBuyIn: number;
-  myCashOut: number;
-  myProfit: number;
 }
 
 /** A fully-fetched notification row ready for the frontend. */

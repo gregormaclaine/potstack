@@ -14,7 +14,7 @@ import { GROUP_COLORS } from "@/components/players/PlayerList";
 import { getSessionPredominantGroups, type SessionGroupLabel } from "@/lib/breakdowns";
 import { formatDate } from "@/lib/formatters";
 import { useFormatCurrency } from "@/contexts/SettingsContext";
-import type { SessionWithPlayers, PokerEvent } from "@/types";
+import type { SessionWithPlayers, AcceptedSessionRef, PokerEvent } from "@/types";
 
 function GroupChip({ group }: { group: SessionGroupLabel }) {
   const isUngrouped = group.id === null;
@@ -99,28 +99,73 @@ const TABLE_HEADER = (
   </thead>
 );
 
+type SessionListItem =
+  | { type: "owned"; session: SessionWithPlayers }
+  | { type: "accepted"; ref: AcceptedSessionRef };
+
 type RenderItem =
   | { kind: "event"; event: PokerEvent; sessions: SessionWithPlayers[]; sortDate: number }
-  | { kind: "session"; session: SessionWithPlayers; sortDate: number };
+  | { kind: "session"; item: SessionListItem; sortDate: number };
 
 type Group =
   | { kind: "event"; event: PokerEvent; sessions: SessionWithPlayers[]; sortDate: number }
-  | { kind: "sessions"; sessions: SessionWithPlayers[]; sortDate: number };
+  | { kind: "sessions"; items: SessionListItem[]; sortDate: number };
 
 interface SessionsViewProps {
   sessions: SessionWithPlayers[];
+  acceptedSessions: AcceptedSessionRef[];
   initialEvents: PokerEvent[];
   total: number;
   page: number;
   totalPages: number;
 }
 
-export default function SessionsView({ sessions, initialEvents, total, page, totalPages }: SessionsViewProps) {
+function AcceptedSessionRow({ ref: acceptedRef, onRemove }: { ref: AcceptedSessionRef; onRemove: (id: number) => void }) {
+  const { formatCurrency } = useFormatCurrency();
+  const displayLocation = acceptedRef.localLocation ?? acceptedRef.location;
+  return (
+    <tr className="block bg-zinc-950 transition-colors hover:bg-zinc-900/50 sm:table-row">
+      <td className="block px-4 pt-3 pb-0 sm:table-cell sm:py-3 sm:pb-3">
+        <div className="flex items-center justify-between sm:block">
+          <span className="text-sm text-zinc-300">{formatDate(acceptedRef.date)}</span>
+          <span className="sm:hidden"><Badge value={acceptedRef.myProfit ?? 0} /></span>
+        </div>
+      </td>
+      <td className="block px-4 py-1 text-sm text-zinc-400 sm:table-cell sm:py-3">
+        {displayLocation ?? <span className="text-zinc-600">—</span>}
+        <div className="mt-0.5 text-xs text-zinc-600">shared by @{acceptedRef.inviterUsername}</div>
+      </td>
+      <td className="hidden px-4 py-3 text-right text-sm text-zinc-400 sm:table-cell">{acceptedRef.playerCount}</td>
+      <td className="hidden px-4 py-3 text-right text-sm text-zinc-400 sm:table-cell">{formatCurrency(acceptedRef.myBuyIn ?? 0)}</td>
+      <td className="hidden px-4 py-3 text-right text-sm text-zinc-400 sm:table-cell">{formatCurrency(acceptedRef.myCashOut ?? 0)}</td>
+      <td className="hidden px-4 py-3 text-right sm:table-cell"><Badge value={acceptedRef.myProfit ?? 0} /></td>
+      <td className="block px-4 py-1 sm:hidden">
+        <div className="flex gap-4 text-xs text-zinc-500">
+          <span><span className="text-zinc-600">Players:</span> {acceptedRef.playerCount}</span>
+          <span><span className="text-zinc-600">Buy-in:</span> {formatCurrency(acceptedRef.myBuyIn ?? 0)}</span>
+          <span><span className="text-zinc-600">Cash-out:</span> {formatCurrency(acceptedRef.myCashOut ?? 0)}</span>
+        </div>
+      </td>
+      <td className="block px-4 pb-3 pt-2 sm:table-cell sm:py-3">
+        <div className="flex items-center justify-end gap-2">
+          <Link href={`/accepted-sessions/${acceptedRef.id}`}>
+            <Button size="sm" variant="ghost">View</Button>
+          </Link>
+          <Button size="sm" variant="danger" onClick={() => onRemove(acceptedRef.id)}>Delete</Button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+export default function SessionsView({ sessions, acceptedSessions, initialEvents, total, page, totalPages }: SessionsViewProps) {
   const router = useRouter();
   const [events, setEvents] = useState<PokerEvent[]>(initialEvents);
   const [collapsedEvents, setCollapsedEvents] = useState<Set<number>>(new Set());
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [removingAcceptedId, setRemovingAcceptedId] = useState<number | null>(null);
+  const [removingAccepted, setRemovingAccepted] = useState(false);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PokerEvent | null>(null);
 
@@ -145,6 +190,17 @@ export default function SessionsView({ sessions, initialEvents, total, page, tot
       router.refresh();
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function confirmRemoveAccepted(id: number) {
+    setRemovingAccepted(true);
+    try {
+      await fetch(`/api/accepted-sessions/${id}`, { method: "DELETE" });
+      setRemovingAcceptedId(null);
+      router.refresh();
+    } finally {
+      setRemovingAccepted(false);
     }
   }
 
@@ -178,9 +234,9 @@ export default function SessionsView({ sessions, initialEvents, total, page, tot
     });
   }
 
-  // Assign sessions to their matching event
+  // Assign owned sessions to their matching event
   const eventSessions = new Map<number, SessionWithPlayers[]>();
-  const ungroupedSessions: SessionWithPlayers[] = [];
+  const ungroupedItems: SessionListItem[] = [];
 
   for (const session of sessions) {
     const sessionDate = new Date(session.date);
@@ -196,8 +252,13 @@ export default function SessionsView({ sessions, initialEvents, total, page, tot
       list.push(session);
       eventSessions.set(matchedEvent.id, list);
     } else {
-      ungroupedSessions.push(session);
+      ungroupedItems.push({ type: "owned", session });
     }
+  }
+
+  // Accepted sessions always go in the ungrouped list (not grouped into events)
+  for (const ref of acceptedSessions) {
+    ungroupedItems.push({ type: "accepted", ref });
   }
 
   // Build chronological item list (desc)
@@ -210,10 +271,10 @@ export default function SessionsView({ sessions, initialEvents, total, page, tot
         sessions: eventSessions.get(event.id) ?? [],
         sortDate: new Date(event.startDate).getTime(),
       })),
-    ...ungroupedSessions.map((session): RenderItem => ({
+    ...ungroupedItems.map((item): RenderItem => ({
       kind: "session",
-      session,
-      sortDate: new Date(session.date).getTime(),
+      item,
+      sortDate: new Date(item.type === "owned" ? item.session.date : item.ref.date).getTime(),
     })),
   ].sort((a, b) => b.sortDate - a.sortDate);
 
@@ -225,9 +286,9 @@ export default function SessionsView({ sessions, initialEvents, total, page, tot
     } else {
       const last = groups[groups.length - 1];
       if (last && last.kind === "sessions") {
-        last.sessions.push(item.session);
+        last.items.push(item.item);
       } else {
-        groups.push({ kind: "sessions", sessions: [item.session], sortDate: item.sortDate });
+        groups.push({ kind: "sessions", items: [item.item], sortDate: item.sortDate });
       }
     }
   }
@@ -260,7 +321,7 @@ export default function SessionsView({ sessions, initialEvents, total, page, tot
     />
   );
 
-  if (sessions.length === 0 && events.length === 0) {
+  if (sessions.length === 0 && acceptedSessions.length === 0 && events.length === 0) {
     return (
       <>
         {header}
@@ -278,7 +339,7 @@ export default function SessionsView({ sessions, initialEvents, total, page, tot
   return (
     <>
       {header}
-      <p className="mb-3 text-sm text-zinc-500">{total} session{total !== 1 ? "s" : ""}</p>
+      <p className="mb-3 text-sm text-zinc-500">{total + acceptedSessions.length} session{total + acceptedSessions.length !== 1 ? "s" : ""}</p>
 
       <div className="flex flex-col gap-3">
         {groups.map((group, i) => {
@@ -321,9 +382,11 @@ export default function SessionsView({ sessions, initialEvents, total, page, tot
               <table className="w-full">
                 {TABLE_HEADER}
                 <tbody className="divide-y divide-zinc-800">
-                  {group.sessions.map((s) => (
-                    <SessionRow key={s.id} session={s} onEdit={handleEditSession} onDelete={setDeletingId} />
-                  ))}
+                  {group.items.map((item) =>
+                    item.type === "owned"
+                      ? <SessionRow key={`owned-${item.session.id}`} session={item.session} onEdit={handleEditSession} onDelete={setDeletingId} />
+                      : <AcceptedSessionRow key={`accepted-${item.ref.id}`} ref={item.ref} onRemove={setRemovingAcceptedId} />
+                  )}
                 </tbody>
               </table>
             </div>
@@ -338,6 +401,18 @@ export default function SessionsView({ sessions, initialEvents, total, page, tot
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setDeletingId(null)}>Cancel</Button>
           <Button variant="danger" loading={deleting} onClick={() => deletingId && confirmDelete(deletingId)}>
+            Delete
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={removingAcceptedId !== null} onClose={() => setRemovingAcceptedId(null)} title="Delete Shared Session">
+        <p className="mb-4 text-sm text-zinc-400">
+          Remove this shared session from your list? You can re-accept the invite from your notifications if needed.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setRemovingAcceptedId(null)}>Cancel</Button>
+          <Button variant="danger" loading={removingAccepted} onClick={() => removingAcceptedId && confirmRemoveAccepted(removingAcceptedId)}>
             Delete
           </Button>
         </div>

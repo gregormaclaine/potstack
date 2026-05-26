@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, KeyboardEvent } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
+import PlayerCombobox, { type ComboboxPlayer } from "@/components/ui/PlayerCombobox";
 import { formatDate } from "@/lib/formatters";
 import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type {
@@ -13,100 +15,7 @@ import type {
   NotificationData,
   LinkRequestReceivedData,
   SessionInviteReceivedData,
-  ResolvedPlayer,
-  UnresolvedPlayer,
-  PlayerMapping,
-  DuplicateSessionInfo,
 } from "@/types";
-
-// ── Player combobox ───────────────────────────────────────────────────────────
-
-interface ComboboxPlayer { id: number; name: string }
-
-function PlayerCombobox({
-  players,
-  value,
-  onChange,
-  onConfirm,
-  placeholder,
-}: {
-  players: ComboboxPlayer[];
-  value: ComboboxPlayer | null;
-  onChange: (p: ComboboxPlayer | null) => void;
-  onConfirm?: () => void;
-  placeholder?: string;
-}) {
-  const [query, setQuery] = useState(value?.name ?? "");
-  const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const trimmed = query.trim();
-  const matched = players.filter(
-    (p) => !trimmed || p.name.toLowerCase().includes(trimmed.toLowerCase())
-  );
-  const exactMatch = matched.some((p) => p.name.toLowerCase() === trimmed.toLowerCase());
-  const showAdd = trimmed.length > 0 && !exactMatch;
-  const options: ComboboxPlayer[] = showAdd ? [...matched, { id: -1, name: trimmed }] : matched;
-  const isOpen = open && options.length > 0;
-
-  function select(opt: ComboboxPlayer) {
-    onChange(opt);
-    setQuery(opt.name);
-    setOpen(false);
-    setActiveIndex(-1);
-  }
-
-  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (isOpen && activeIndex >= 0) { select(options[activeIndex]); return; }
-      if (value && onConfirm) { onConfirm(); return; }
-      if (trimmed && matched.length === 0) { select({ id: -1, name: trimmed }); return; }
-      return;
-    }
-    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIndex((i) => Math.min(i + 1, options.length - 1)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIndex((i) => Math.max(i - 1, 0)); }
-    else if (e.key === "Escape") { setOpen(false); setActiveIndex(-1); }
-  }
-
-  return (
-    <div ref={containerRef} className="relative">
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => { setQuery(e.target.value); setOpen(true); setActiveIndex(-1); onChange(null); }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder ?? "Search or type a new player name…"}
-        className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-      />
-      {isOpen && (
-        <ul className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-zinc-700 bg-zinc-900 shadow-lg">
-          {options.map((opt, i) => (
-            <li key={opt.id}>
-              <button
-                type="button"
-                onMouseDown={() => select(opt)}
-                className={clsx(
-                  "w-full px-3 py-2 text-left text-sm transition-colors",
-                  i === activeIndex ? "bg-emerald-700 text-white"
-                    : opt.id === -1 ? "text-emerald-400 hover:bg-zinc-800"
-                    : "text-zinc-200 hover:bg-zinc-800"
-                )}
-              >
-                {opt.id === -1
-                  ? <span className="flex items-center gap-1"><span className="text-emerald-400">+</span> Create &ldquo;{trimmed}&rdquo;</span>
-                  : opt.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -135,9 +44,15 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-/** Renders a session date as a clickable link, or greyed-out with a tooltip if the session is gone. */
-function SessionLink({ sessionId, date }: { sessionId: number | null; date: string }) {
+function SessionLink({ sessionId, date, acceptedSessionId }: { sessionId: number | null; date: string; acceptedSessionId?: number }) {
   const label = formatDate(date);
+  if (acceptedSessionId != null) {
+    return (
+      <Link href={`/accepted-sessions/${acceptedSessionId}`} className="text-zinc-200 underline underline-offset-2 hover:text-white">
+        {label}
+      </Link>
+    );
+  }
   if (sessionId !== null) {
     return (
       <Link href={`/sessions/${sessionId}`} className="text-zinc-200 underline underline-offset-2 hover:text-white">
@@ -155,18 +70,6 @@ function SessionLink({ sessionId, date }: { sessionId: number | null; date: stri
   );
 }
 
-// ── Invite accept state machine ───────────────────────────────────────────────
-
-type InviteAcceptPhase =
-  | { phase: "idle" }
-  | { phase: "resolving"; isOverwrite: boolean; existingSessionId?: number }
-  | { phase: "mapping"; resolved: ResolvedPlayer[]; unresolved: UnresolvedPlayer[]; mappings: Record<number, ComboboxPlayer | null>; isOverwrite: boolean; existingSessionId?: number }
-  | { phase: "submitting" };
-
-type DuplicateCheckState =
-  | { status: "checking" }
-  | { status: "done"; result: DuplicateSessionInfo | null };
-
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface MyPlayer { id: number; name: string }
@@ -179,214 +82,10 @@ interface NotificationsFeedProps {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function NotificationsFeed({ notifications, myPlayers }: NotificationsFeedProps) {
-  const [loadingAction, setLoadingAction] = useState<{ notifId: number; button: string } | null>(null);
-
-  // Link accept flow
-  const [acceptingLinkNotifId, setAcceptingLinkNotifId] = useState<number | null>(null);
-  const [selectedPlayer, setSelectedPlayer] = useState<ComboboxPlayer | null>(null);
-  const [pickError, setPickError] = useState("");
-
-  // Invite accept state machine (per notification id)
-  const [inviteAcceptStates, setInviteAcceptStates] = useState<Record<number, InviteAcceptPhase>>({});
-  const [inviteError, setInviteError] = useState<Record<number, string>>({});
-
-  // Duplicate session check results (per notification id), populated client-side on mount
-  const [duplicateChecks, setDuplicateChecks] = useState<Record<number, DuplicateCheckState>>({});
-
-  // Optimistic notification list (allows removing/replacing in-place)
   const [notifList, setNotifList] = useState<NotificationRow[]>(notifications);
 
-  useEffect(() => {
-    const pending = notifications.filter(
-      (n) => n.type === "session_invite_received" && n.invite?.status === "PENDING" && n.inviteId !== null
-    );
-    if (pending.length === 0) return;
-
-    setDuplicateChecks(
-      Object.fromEntries(pending.map((n) => [n.id, { status: "checking" } as DuplicateCheckState]))
-    );
-
-    for (const n of pending) {
-      fetch(`/api/invites/${n.inviteId}/duplicate`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((result: DuplicateSessionInfo | null) => {
-          setDuplicateChecks((prev) => ({ ...prev, [n.id]: { status: "done", result } }));
-        })
-        .catch(() => {
-          setDuplicateChecks((prev) => ({ ...prev, [n.id]: { status: "done", result: null } }));
-        });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function replaceNotif(id: number, replacement: NotificationRow | null) {
-    setNotifList((prev) =>
-      replacement
-        ? prev.map((n) => (n.id === id ? replacement : n))
-        : prev.filter((n) => n.id !== id)
-    );
-  }
-
-  function getInvitePhase(id: number): InviteAcceptPhase {
-    return inviteAcceptStates[id] ?? { phase: "idle" };
-  }
-  function setInvitePhase(id: number, phase: InviteAcceptPhase) {
-    setInviteAcceptStates((prev) => ({ ...prev, [id]: phase }));
-  }
-
-  // ── Link accept ────────────────────────────────────────────────────────────
-
-  async function confirmAcceptLink(notifId: number, linkId: number, data: LinkRequestReceivedData) {
-    setPickError("");
-    if (!selectedPlayer) { setPickError("Please select or create a player."); return; }
-
-    setLoadingAction({ notifId, button: "confirm" });
-    try {
-      const isCreating = selectedPlayer.id === -1;
-      const body: Record<string, unknown> = { action: "accept" };
-      if (isCreating) { body.newPlayerName = selectedPlayer.name; }
-      else { body.targetPlayerId = selectedPlayer.id; }
-
-      const res = await fetch(`/api/links/${linkId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const resData = await res.json();
-      if (!res.ok) { setPickError(resData.error ?? "Failed to accept"); return; }
-
-      // Replace with accepted notification optimistically
-      replaceNotif(notifId, {
-        ...notifList.find((n) => n.id === notifId)!,
-        type: "link_accepted",
-        data: { type: "link_accepted", otherUsername: data.requesterUsername, myPlayerName: selectedPlayer.name },
-        link: { status: "ACCEPTED" },
-      });
-      setAcceptingLinkNotifId(null);
-    } finally {
-      setLoadingAction(null);
-    }
-  }
-
-  async function rejectLink(notifId: number, linkId: number, data: LinkRequestReceivedData) {
-    setLoadingAction({ notifId, button: "reject" });
-    try {
-      const res = await fetch(`/api/links/${linkId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reject" }),
-      });
-      if (!res.ok) return;
-
-      replaceNotif(notifId, {
-        ...notifList.find((n) => n.id === notifId)!,
-        type: "link_rejected_received",
-        data: { type: "link_rejected_received", otherUsername: data.requesterUsername, playerName: data.playerName },
-        link: { status: "REJECTED" },
-      });
-    } finally {
-      setLoadingAction(null);
-    }
-  }
-
-  // ── Invite accept ──────────────────────────────────────────────────────────
-
-  async function startInviteAccept(notifId: number, inviteId: number, isOverwrite: boolean, existingSessionId?: number, button = "accept") {
-    setInvitePhase(notifId, { phase: "resolving", isOverwrite, existingSessionId });
-    setInviteError((prev) => ({ ...prev, [notifId]: "" }));
-
-    try {
-      const res = await fetch(`/api/invites/${inviteId}/players`);
-      if (!res.ok) { setInvitePhase(notifId, { phase: "idle" }); return; }
-      const data: { resolved: ResolvedPlayer[]; unresolved: UnresolvedPlayer[] } = await res.json();
-
-      if (data.unresolved.length === 0) {
-        await submitInviteAccept(notifId, inviteId, data.resolved, [], isOverwrite, existingSessionId, button);
-      } else {
-        setInvitePhase(notifId, { phase: "mapping", resolved: data.resolved, unresolved: data.unresolved, mappings: {}, isOverwrite, existingSessionId });
-      }
-    } catch {
-      setInvitePhase(notifId, { phase: "idle" });
-    }
-  }
-
-  async function submitInviteAccept(
-    notifId: number,
-    inviteId: number,
-    _resolved: ResolvedPlayer[],
-    unresolvedMappings: Array<{ fromPlayerId: number; player: ComboboxPlayer | null }>,
-    isOverwrite = false,
-    existingSessionId?: number,
-    button = "accept",
-  ) {
-    setInvitePhase(notifId, { phase: "submitting" });
-    setLoadingAction({ notifId, button });
-
-    const playerMappings: PlayerMapping[] = unresolvedMappings
-      .filter((m) => m.player !== null)
-      .map((m) => {
-        const p = m.player!;
-        if (p.id === -1) return { fromPlayerId: m.fromPlayerId, newPlayerName: p.name };
-        return { fromPlayerId: m.fromPlayerId, toPlayerId: p.id };
-      });
-
-    const action = isOverwrite ? "overwrite" : "accept";
-    const body: { action: string; playerMappings: PlayerMapping[]; existingSessionId?: number } = { action, playerMappings };
-    if (isOverwrite && existingSessionId !== undefined) body.existingSessionId = existingSessionId;
-
-    try {
-      const res = await fetch(`/api/invites/${inviteId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setInviteError((prev) => ({ ...prev, [notifId]: data.error ?? "Failed to accept" }));
-        setInvitePhase(notifId, inviteAcceptStates[notifId] ?? { phase: "idle" });
-        return;
-      }
-      const resData: { sessionId: number } = await res.json();
-      const notif = notifList.find((n) => n.id === notifId);
-      if (notif && notif.data.type === "session_invite_received") {
-        const d = notif.data;
-        replaceNotif(notifId, {
-          ...notif,
-          type: "session_invite_accepted_by_me",
-          data: { type: "session_invite_accepted_by_me", otherUsername: d.inviterUsername, sessionDate: d.sessionDate, sessionLocation: d.sessionLocation },
-          sessionId: resData.sessionId,
-          invite: { status: "ACCEPTED" },
-        });
-      }
-      setInvitePhase(notifId, { phase: "idle" });
-    } finally {
-      setLoadingAction(null);
-    }
-  }
-
-  async function rejectInvite(notifId: number, inviteId: number) {
-    setLoadingAction({ notifId, button: "reject" });
-    try {
-      const res = await fetch(`/api/invites/${inviteId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reject" }),
-      });
-      if (!res.ok) return;
-
-      const notif = notifList.find((n) => n.id === notifId);
-      if (notif && notif.data.type === "session_invite_received") {
-        const d = notif.data;
-        replaceNotif(notifId, {
-          ...notif,
-          type: "session_invite_rejected_by_me",
-          data: { type: "session_invite_rejected_by_me", otherUsername: d.inviterUsername, sessionDate: d.sessionDate, sessionLocation: d.sessionLocation },
-          invite: { status: "REJECTED" },
-        });
-      }
-    } finally {
-      setLoadingAction(null);
-    }
+  function replaceNotif(id: number, replacement: NotificationRow) {
+    setNotifList((prev) => prev.map((n) => (n.id === id ? replacement : n)));
   }
 
   if (notifList.length === 0) {
@@ -396,43 +95,27 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
   return (
     <ul className="space-y-3">
       {notifList.map((notif) => {
-        const { id, type, data, sessionId, link, invite, createdAt } = notif;
-        const loadingButton = loadingAction?.notifId === id ? loadingAction.button : null;
+        const { id, type, data, sessionId } = notif;
 
-        // ── Link request received (actionable) ────────────────────────────────
         if (type === "link_request_received") {
           const d = data as LinkRequestReceivedData & { type: "link_request_received" };
-          const linkPending = link?.status === "PENDING";
-          const isAccepting = acceptingLinkNotifId === id;
-          const linkId = notif.linkId ?? 0;
-
+          const linkPending = notif.link?.status === "PENDING";
           return (
             <LinkRequestReceivedCard
               key={id}
               notif={notif}
               d={d}
               linkPending={linkPending}
-              isAccepting={isAccepting}
-              loadingButton={loadingButton}
+              linkId={notif.linkId ?? 0}
               myPlayers={myPlayers}
-              selectedPlayer={selectedPlayer}
-              pickError={pickError}
-              onStartAccept={() => { setAcceptingLinkNotifId(id); setSelectedPlayer(null); setPickError(""); }}
-              onCancelAccept={() => { setAcceptingLinkNotifId(null); setPickError(""); }}
-              onPlayerChange={(p) => { setSelectedPlayer(p); setPickError(""); }}
-              onConfirmAccept={() => confirmAcceptLink(id, linkId, d)}
-              onReject={() => rejectLink(id, linkId, d)}
+              onReplace={(n) => replaceNotif(id, n)}
             />
           );
         }
 
-        // ── Session invite received (actionable) ──────────────────────────────
         if (type === "session_invite_received") {
           const d = data as SessionInviteReceivedData & { type: "session_invite_received" };
-          const invitePending = invite?.status === "PENDING";
-          const invitePhase = getInvitePhase(id);
-          const err = inviteError[id];
-
+          const invitePending = notif.invite?.status === "PENDING";
           return (
             <SessionInviteReceivedCard
               key={id}
@@ -440,37 +123,11 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
               d={d}
               sessionId={sessionId}
               invitePending={invitePending}
-              invitePhase={invitePhase}
-              loadingButton={loadingButton}
-              myPlayers={myPlayers}
-              error={err}
-              createdAt={createdAt}
-              duplicateCheck={duplicateChecks[id]}
-              onStartAccept={(isOverwrite, existingSessionId) => {
-                if (notif.inviteId !== null) startInviteAccept(id, notif.inviteId!, isOverwrite, existingSessionId);
-              }}
-              onReject={() => { if (notif.inviteId !== null) rejectInvite(id, notif.inviteId!); }}
-              onMappingChange={(fromPlayerId, player) => {
-                setInviteAcceptStates((prev) => {
-                  const cur = prev[id];
-                  if (!cur || cur.phase !== "mapping") return prev;
-                  return { ...prev, [id]: { ...cur, mappings: { ...cur.mappings, [fromPlayerId]: player } } };
-                });
-              }}
-              onCancelMapping={() => setInvitePhase(id, { phase: "idle" })}
-              onSubmitMapping={() => {
-                if (invitePhase.phase !== "mapping") return;
-                submitInviteAccept(
-                  id, notif.inviteId!, invitePhase.resolved,
-                  invitePhase.unresolved.map((u) => ({ fromPlayerId: u.fromPlayerId, player: invitePhase.mappings[u.fromPlayerId] ?? null })),
-                  invitePhase.isOverwrite, invitePhase.existingSessionId,
-                );
-              }}
+              onReplace={(n) => replaceNotif(id, n)}
             />
           );
         }
 
-        // ── All other notification types (display-only) ───────────────────────
         return (
           <li key={id} className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3">
             <div className="flex items-start justify-between gap-3">
@@ -478,7 +135,7 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
                 <p className="text-sm text-zinc-300">
                   <NotificationText data={data} sessionId={sessionId} />
                 </p>
-                <p className="text-xs text-zinc-600">{timeAgo(createdAt)}</p>
+                <p className="text-xs text-zinc-600">{timeAgo(notif.createdAt)}</p>
               </div>
             </div>
           </li>
@@ -488,7 +145,7 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
   );
 }
 
-// ── NotificationText — maps every non-actionable type to its message ──────────
+// ── NotificationText ──────────────────────────────────────────────────────────
 
 function NotificationText({ data, sessionId }: { data: NotificationData; sessionId: number | null }) {
   switch (data.type) {
@@ -508,7 +165,7 @@ function NotificationText({ data, sessionId }: { data: NotificationData; session
       return <><span className="font-medium text-zinc-100">@{data.otherUsername}</span> accepted your session from <SessionLink sessionId={sessionId} date={data.sessionDate} /></>;
 
     case "session_invite_accepted_by_me":
-      return <>You accepted <span className="font-medium text-zinc-100">@{data.otherUsername}</span>&apos;s session from <SessionLink sessionId={sessionId} date={data.sessionDate} /></>;
+      return <>You accepted <span className="font-medium text-zinc-100">@{data.otherUsername}</span>&apos;s session from <SessionLink sessionId={sessionId} date={data.sessionDate} acceptedSessionId={data.acceptedSessionId} /></>;
 
     case "session_invite_rejected":
       return <><span className="font-medium text-zinc-100">@{data.otherUsername}</span> rejected your session from <SessionLink sessionId={sessionId} date={data.sessionDate} /></>;
@@ -527,34 +184,71 @@ function LinkRequestReceivedCard({
   notif,
   d,
   linkPending,
-  isAccepting,
-  loadingButton,
+  linkId,
   myPlayers,
-  selectedPlayer,
-  pickError,
-  onStartAccept,
-  onCancelAccept,
-  onPlayerChange,
-  onConfirmAccept,
-  onReject,
+  onReplace,
 }: {
   notif: NotificationRow;
   d: LinkRequestReceivedData;
   linkPending: boolean;
-  isAccepting: boolean;
-  loadingButton: string | null;
+  linkId: number;
   myPlayers: { id: number; name: string }[];
-  selectedPlayer: ComboboxPlayer | null;
-  pickError: string;
-  onStartAccept: () => void;
-  onCancelAccept: () => void;
-  onPlayerChange: (p: ComboboxPlayer | null) => void;
-  onConfirmAccept: (linkId: number) => void;
-  onReject: (linkId: number) => void;
+  onReplace: (n: NotificationRow) => void;
 }) {
-  // linkId is stored on the notification row — we surface it via notif.linkId
-  // (the page passes it through NotificationRow; here we read it from the raw notif)
-  const linkId = (notif as NotificationRow & { linkId?: number }).linkId ?? 0;
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<ComboboxPlayer | null>(null);
+  const [pickError, setPickError] = useState("");
+  const [loading, setLoading] = useState<"confirm" | "reject" | null>(null);
+
+  async function confirmAccept() {
+    setPickError("");
+    if (!selectedPlayer) { setPickError("Please select or create a player."); return; }
+
+    setLoading("confirm");
+    try {
+      const isCreating = selectedPlayer.id === -1;
+      const body: Record<string, unknown> = { action: "accept" };
+      if (isCreating) { body.newPlayerName = selectedPlayer.name; }
+      else { body.targetPlayerId = selectedPlayer.id; }
+
+      const res = await fetch(`/api/links/${linkId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const resData: { error?: string } = await res.json();
+      if (!res.ok) { setPickError(resData.error ?? "Failed to accept"); return; }
+
+      onReplace({
+        ...notif,
+        type: "link_accepted",
+        data: { type: "link_accepted", otherUsername: d.requesterUsername, myPlayerName: selectedPlayer.name },
+        link: { status: "ACCEPTED" },
+      });
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function reject() {
+    setLoading("reject");
+    try {
+      const res = await fetch(`/api/links/${linkId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reject" }),
+      });
+      if (!res.ok) return;
+      onReplace({
+        ...notif,
+        type: "link_rejected_received",
+        data: { type: "link_rejected_received", otherUsername: d.requesterUsername, playerName: d.playerName },
+        link: { status: "REJECTED" },
+      });
+    } finally {
+      setLoading(null);
+    }
+  }
 
   return (
     <li className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 space-y-2">
@@ -571,8 +265,8 @@ function LinkRequestReceivedCard({
 
       {linkPending && !isAccepting && (
         <div className="flex justify-end gap-2">
-          <Button size="sm" variant="ghost" loading={loadingButton === "reject"} onClick={() => onReject(linkId)}>Reject</Button>
-          <Button size="sm" onClick={onStartAccept}>Accept</Button>
+          <Button size="sm" variant="ghost" loading={loading === "reject"} onClick={reject}>Reject</Button>
+          <Button size="sm" onClick={() => { setIsAccepting(true); setSelectedPlayer(null); setPickError(""); }}>Accept</Button>
         </div>
       )}
 
@@ -584,13 +278,13 @@ function LinkRequestReceivedCard({
           <PlayerCombobox
             players={myPlayers}
             value={selectedPlayer}
-            onChange={onPlayerChange}
-            onConfirm={() => onConfirmAccept(linkId)}
+            onChange={(p) => { setSelectedPlayer(p); setPickError(""); }}
+            onConfirm={confirmAccept}
           />
           {pickError && <p className="text-sm text-red-400">{pickError}</p>}
           <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={onCancelAccept}>Cancel</Button>
-            <Button size="sm" loading={loadingButton === "confirm"} onClick={() => onConfirmAccept(linkId)}>Confirm</Button>
+            <Button size="sm" variant="ghost" onClick={() => { setIsAccepting(false); setPickError(""); }}>Cancel</Button>
+            <Button size="sm" loading={loading === "confirm"} onClick={confirmAccept}>Confirm</Button>
           </div>
         </div>
       )}
@@ -598,7 +292,7 @@ function LinkRequestReceivedCard({
   );
 }
 
-// ── InviteSessionDetail type ──────────────────────────────────────────────────
+// ── InviteSessionDetail types ─────────────────────────────────────────────────
 
 interface InviteSessionDetailPlayer {
   name: string;
@@ -626,39 +320,20 @@ function SessionInviteReceivedCard({
   d,
   sessionId,
   invitePending,
-  invitePhase,
-  loadingButton,
-  myPlayers,
-  error,
-  createdAt,
-  duplicateCheck,
-  onStartAccept,
-  onReject,
-  onMappingChange,
-  onCancelMapping,
-  onSubmitMapping,
+  onReplace,
 }: {
   notif: NotificationRow;
   d: SessionInviteReceivedData;
   sessionId: number | null;
   invitePending: boolean;
-  invitePhase: InviteAcceptPhase;
-  loadingButton: string | null;
-  myPlayers: { id: number; name: string }[];
-  error: string | undefined;
-  createdAt: string;
-  duplicateCheck: DuplicateCheckState | undefined;
-  onStartAccept: (isOverwrite: boolean, existingSessionId?: number, button?: string) => void;
-  onReject: () => void;
-  onMappingChange: (fromPlayerId: number, player: ComboboxPlayer | null) => void;
-  onCancelMapping: () => void;
-  onSubmitMapping: () => void;
+  onReplace: (n: NotificationRow) => void;
 }) {
+  const router = useRouter();
   const { formatCurrency } = useFormatCurrency();
+  const [loading, setLoading] = useState<"accept" | "reject" | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewData, setViewData] = useState<InviteSessionDetail | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
-  const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false);
 
   async function openView() {
     setViewOpen(true);
@@ -672,17 +347,41 @@ function SessionInviteReceivedCard({
     }
   }
 
-  const dupResult = duplicateCheck?.status === "done" ? duplicateCheck.result : null;
+  async function accept() {
+    if (!notif.inviteId) return;
+    setLoading("accept");
+    try {
+      const res = await fetch(`/api/invites/${notif.inviteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "accept" }),
+      });
+      if (!res.ok) return;
+      const data: { acceptedSessionId: number } = await res.json();
+      router.push(`/accepted-sessions/${data.acceptedSessionId}`);
+    } finally {
+      setLoading(null);
+    }
+  }
 
-  function handleOverwriteClick() {
-    if (!dupResult) return;
-    const financialsDiffer =
-      d.buyIn !== dupResult.myBuyIn ||
-      d.cashOut !== dupResult.myCashOut;
-    if (financialsDiffer) {
-      setOverwriteConfirmOpen(true);
-    } else {
-      onStartAccept(true, dupResult.sessionId, "update");
+  async function reject() {
+    if (!notif.inviteId) return;
+    setLoading("reject");
+    try {
+      const res = await fetch(`/api/invites/${notif.inviteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reject" }),
+      });
+      if (!res.ok) return;
+      onReplace({
+        ...notif,
+        type: "session_invite_rejected_by_me",
+        data: { type: "session_invite_rejected_by_me", otherUsername: d.inviterUsername, sessionDate: d.sessionDate, sessionLocation: d.sessionLocation },
+        invite: { status: "REJECTED" },
+      });
+    } finally {
+      setLoading(null);
     }
   }
 
@@ -695,7 +394,7 @@ function SessionInviteReceivedCard({
             <SessionLink sessionId={sessionId} date={d.sessionDate} />
             {d.sessionLocation && <span className="text-zinc-500"> @ {d.sessionLocation}</span>}
           </p>
-          <p className="text-xs text-zinc-600">{timeAgo(createdAt)}</p>
+          <p className="text-xs text-zinc-600">{timeAgo(notif.createdAt)}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {!invitePending && <StatusPill status={notif.invite?.status ?? "PENDING"} />}
@@ -708,129 +407,23 @@ function SessionInviteReceivedCard({
         </div>
       </div>
 
-      {invitePending && invitePhase.phase === "idle" && (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-4 text-sm">
-              {d.buyIn != null && <span className="text-zinc-400"><span className="mr-1 text-xs text-zinc-600">Buy-in</span>{formatCurrency(d.buyIn)}</span>}
-              {d.cashOut != null && <span className="text-zinc-400"><span className="mr-1 text-xs text-zinc-600">Cash-out</span>{formatCurrency(d.cashOut)}</span>}
-              {d.profit != null && <Badge value={d.profit} />}
-            </div>
-            <div className="flex gap-2">
-              {(!duplicateCheck || duplicateCheck.status === "checking") ? (
-                <>
-                  <Button size="sm" variant="ghost" loading={loadingButton === "reject"} onClick={onReject}>Reject</Button>
-                  <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-                    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-400" />
-                    Checking…
-                  </span>
-                </>
-              ) : dupResult === null ? (
-                <>
-                  <Button size="sm" variant="ghost" loading={loadingButton === "reject"} onClick={onReject}>Reject</Button>
-                  <Button size="sm" loading={loadingButton === "accept"} onClick={() => onStartAccept(false, undefined, "accept")}>Accept</Button>
-                </>
-              ) : null}
-            </div>
+      {invitePending && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-4 text-sm">
+            {d.buyIn != null && <span className="text-zinc-400"><span className="mr-1 text-xs text-zinc-600">Buy-in</span>{formatCurrency(d.buyIn)}</span>}
+            {d.cashOut != null && <span className="text-zinc-400"><span className="mr-1 text-xs text-zinc-600">Cash-out</span>{formatCurrency(d.cashOut)}</span>}
+            {d.profit != null && <Badge value={d.profit} />}
           </div>
-
-          {dupResult !== null && (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-zinc-400">
-                Found matching session:{" "}
-                <Link href={`/sessions/${dupResult.sessionId}`} className="text-zinc-200 underline underline-offset-2 hover:text-white">
-                  {formatDate(d.sessionDate)}
-                </Link>
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="ghost" loading={loadingButton === "reject"} onClick={onReject}>Reject</Button>
-                <Button size="sm" variant="ghost" loading={loadingButton === "save-as-new"} onClick={() => onStartAccept(false, undefined, "save-as-new")}>
-                  Save as new
-                </Button>
-                <Button size="sm" loading={loadingButton === "update"} onClick={handleOverwriteClick}>
-                  Update existing
-                </Button>
-              </div>
-            </div>
-          )}
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" loading={loading === "reject"} onClick={reject}>Reject</Button>
+            <Button size="sm" loading={loading === "accept"} onClick={accept}>Accept</Button>
+          </div>
         </div>
-      )}
-
-      {invitePending && invitePhase.phase === "resolving" && (
-        <p className="text-sm text-zinc-500 text-right">Checking players…</p>
-      )}
-
-      {invitePending && invitePhase.phase === "mapping" && (
-        <InviteMappingUI
-          invitePhase={invitePhase}
-          myPlayers={myPlayers}
-          error={error}
-          submitting={false}
-          onMappingChange={(fromPlayerId, player) => onMappingChange(fromPlayerId, player)}
-          onCancel={onCancelMapping}
-          onSubmit={onSubmitMapping}
-        />
-      )}
-
-      {invitePending && invitePhase.phase === "submitting" && (
-        <p className="text-sm text-zinc-500 text-right">Accepting…</p>
       )}
 
       {!invitePending && d.profit != null && <Badge value={d.profit} />}
 
-      <Modal
-        open={overwriteConfirmOpen}
-        onClose={() => setOverwriteConfirmOpen(false)}
-        title="Update existing session?"
-      >
-        {dupResult && (
-          <div className="space-y-4">
-            <p className="text-sm text-zinc-400">
-              Your recorded figures differ from{" "}
-              <span className="font-medium text-zinc-200">@{d.inviterUsername}</span>&apos;s.
-              Updating will apply their figures to your existing session.
-            </p>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs uppercase text-zinc-600">
-                  <th className="pb-1.5 text-left font-medium"></th>
-                  <th className="pb-1.5 text-right font-medium">Your record</th>
-                  <th className="pb-1.5 text-right font-medium">Their record</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                <tr>
-                  <td className="py-1.5 text-zinc-500">Buy-in</td>
-                  <td className={clsx("py-1.5 text-right", dupResult.myBuyIn !== d.buyIn && "text-amber-300")}>{formatCurrency(dupResult.myBuyIn)}</td>
-                  <td className={clsx("py-1.5 text-right", dupResult.myBuyIn !== d.buyIn ? "text-amber-300 font-medium" : "text-zinc-300")}>{d.buyIn != null ? formatCurrency(d.buyIn) : "—"}</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 text-zinc-500">Cash-out</td>
-                  <td className={clsx("py-1.5 text-right", dupResult.myCashOut !== d.cashOut && "text-amber-300")}>{formatCurrency(dupResult.myCashOut)}</td>
-                  <td className={clsx("py-1.5 text-right", dupResult.myCashOut !== d.cashOut ? "text-amber-300 font-medium" : "text-zinc-300")}>{d.cashOut != null ? formatCurrency(d.cashOut) : "—"}</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 text-zinc-500">Profit</td>
-                  <td className="py-1.5 text-right"><Badge value={dupResult.myProfit} /></td>
-                  <td className="py-1.5 text-right">{d.profit != null ? <Badge value={d.profit} /> : "—"}</td>
-                </tr>
-              </tbody>
-            </table>
-            <div className="flex justify-end gap-2">
-              <Button size="sm" variant="ghost" onClick={() => setOverwriteConfirmOpen(false)}>Cancel</Button>
-              <Button size="sm" onClick={() => { setOverwriteConfirmOpen(false); onStartAccept(true, dupResult.sessionId); }}>
-                Yes, update
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        open={viewOpen}
-        onClose={() => setViewOpen(false)}
-        title="Session Details"
-      >
+      <Modal open={viewOpen} onClose={() => setViewOpen(false)} title="Session Details">
         {viewLoading && <p className="text-sm text-zinc-500">Loading…</p>}
         {!viewLoading && viewData && (
           <div className="space-y-4">
@@ -880,69 +473,5 @@ function SessionInviteReceivedCard({
         )}
       </Modal>
     </li>
-  );
-}
-
-// ── InviteMappingUI ───────────────────────────────────────────────────────────
-
-function InviteMappingUI({
-  invitePhase,
-  myPlayers,
-  error,
-  submitting,
-  onMappingChange,
-  onCancel,
-  onSubmit,
-}: {
-  invitePhase: InviteAcceptPhase & { phase: "mapping" };
-  myPlayers: { id: number; name: string }[];
-  error: string | undefined;
-  submitting: boolean;
-  onMappingChange: (fromPlayerId: number, player: ComboboxPlayer | null) => void;
-  onCancel: () => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <div className="space-y-4 border-t border-zinc-800 pt-3">
-      {invitePhase.resolved.length > 0 && (
-        <div>
-          <p className="mb-1 text-xs text-zinc-500">Automatically included</p>
-          <ul className="space-y-1">
-            {invitePhase.resolved.map((r) => (
-              <li key={r.fromPlayerId} className="flex items-center gap-2 text-sm text-zinc-400">
-                <span className="text-emerald-500">✓</span>
-                <span className="font-medium text-zinc-300">&ldquo;{r.fromPlayerName}&rdquo;</span>
-                <span className="text-zinc-600">→</span>
-                <span className="font-medium text-zinc-300">&ldquo;{r.toPlayerName}&rdquo;</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="space-y-3">
-        <p className="text-sm text-zinc-400">Map the remaining players, or skip them:</p>
-        {invitePhase.unresolved.map((u) => (
-          <div key={u.fromPlayerId} className="space-y-1">
-            <label className="text-xs text-zinc-500">
-              <span className="font-medium text-zinc-300">&ldquo;{u.fromPlayerName}&rdquo;</span>
-            </label>
-            <PlayerCombobox
-              players={myPlayers}
-              value={invitePhase.mappings[u.fromPlayerId] ?? null}
-              onChange={(p) => onMappingChange(u.fromPlayerId, p)}
-              placeholder="Skip, or search / create a player…"
-            />
-          </div>
-        ))}
-      </div>
-
-      {error && <p className="text-sm text-red-400">{error}</p>}
-
-      <div className="flex justify-end gap-2">
-        <Button size="sm" variant="ghost" onClick={onCancel} disabled={submitting}>Cancel</Button>
-        <Button size="sm" loading={submitting} onClick={onSubmit}>Confirm</Button>
-      </div>
-    </div>
   );
 }

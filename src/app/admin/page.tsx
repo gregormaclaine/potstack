@@ -31,14 +31,14 @@ export default async function AdminPage() {
     prisma.sessionPlayer.count(),
     prisma.user.findMany({
       orderBy: { sessions: { _count: "desc" } },
-      take: 10,
+      take: 50,
       select: {
         id: true,
         username: true,
         avatar: true,
         createdAt: true,
         isAdmin: true,
-        _count: { select: { sessions: true, players: true } },
+        _count: { select: { sessions: true, acceptedSessions: true, players: true } },
       },
     }),
     prisma.user.findMany({
@@ -50,7 +50,7 @@ export default async function AdminPage() {
         avatar: true,
         createdAt: true,
         isAdmin: true,
-        _count: { select: { sessions: true } },
+        _count: { select: { sessions: true, acceptedSessions: true } },
       },
     }),
   ]);
@@ -76,14 +76,17 @@ export default async function AdminPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <AdminUsersTable
           title="Most Active Users"
-          users={topUsers.map((u) => ({
-            id: u.id,
-            username: u.username,
-            avatar: u.avatar,
-            isAdmin: u.isAdmin,
-            sessions: u._count.sessions,
-            players: u._count.players,
-          }))}
+          users={topUsers
+            .map((u) => ({
+              id: u.id,
+              username: u.username,
+              avatar: u.avatar,
+              isAdmin: u.isAdmin,
+              sessions: u._count.sessions + u._count.acceptedSessions,
+              players: u._count.players,
+            }))
+            .sort((a, b) => b.sessions - a.sessions)
+            .slice(0, 10)}
           columns={["sessions", "players"]}
           currentUserId={session.user.id}
         />
@@ -95,7 +98,7 @@ export default async function AdminPage() {
             username: u.username,
             avatar: u.avatar,
             isAdmin: u.isAdmin,
-            sessions: u._count.sessions,
+            sessions: u._count.sessions + u._count.acceptedSessions,
             joinedAt: u.createdAt.toISOString(),
           }))}
           columns={["joined", "sessions"]}

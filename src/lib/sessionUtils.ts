@@ -65,21 +65,19 @@ export async function generateSessionInvites(
   userId: number,
   playerIds: number[],
   sessionPlayers: Array<{ id: number; playerId: number }>,
-  pendingLinkPlayerIds: number[] = []
+  pendingLinkPlayerIds: number[] = [],
 ): Promise<void> {
   if (playerIds.length === 0) return;
 
   // Owner links: ACCEPTED for all players, plus PENDING for newly-linked players
-  const ownerLinkFilter = pendingLinkPlayerIds.length > 0
-    ? {
-        ownerUserId: userId,
-        ownerPlayerId: { in: playerIds },
-        OR: [
-          { status: "ACCEPTED" },
-          { status: "PENDING", ownerPlayerId: { in: pendingLinkPlayerIds } },
-        ],
-      }
-    : { ownerUserId: userId, ownerPlayerId: { in: playerIds }, status: "ACCEPTED" };
+  const ownerLinkFilter =
+    pendingLinkPlayerIds.length > 0
+      ? {
+          ownerUserId: userId,
+          ownerPlayerId: { in: playerIds },
+          OR: [{ status: "ACCEPTED" }, { status: "PENDING", ownerPlayerId: { in: pendingLinkPlayerIds } }],
+        }
+      : { ownerUserId: userId, ownerPlayerId: { in: playerIds }, status: "ACCEPTED" };
 
   const [ownerLinks, linkedLinks, session] = await Promise.all([
     prisma.playerLink.findMany({ where: ownerLinkFilter }),
@@ -94,15 +92,18 @@ export async function generateSessionInvites(
 
   if (!session) return;
 
-  const inviteData: Array<{ sessionId: number; sessionPlayerId: number; linkId: number; inviteeId: number }> = [];
+  const inviteData: Array<{ sessionId: number; sessionPlayerId: number; linkId: number; inviteeId: number }> =
+    [];
 
   for (const link of ownerLinks) {
     const sp = sessionPlayers.find((s) => s.playerId === link.ownerPlayerId);
-    if (sp) inviteData.push({ sessionId, sessionPlayerId: sp.id, linkId: link.id, inviteeId: link.linkedUserId });
+    if (sp)
+      inviteData.push({ sessionId, sessionPlayerId: sp.id, linkId: link.id, inviteeId: link.linkedUserId });
   }
   for (const link of linkedLinks) {
     const sp = sessionPlayers.find((s) => s.playerId === link.linkedPlayerId);
-    if (sp) inviteData.push({ sessionId, sessionPlayerId: sp.id, linkId: link.id, inviteeId: link.ownerUserId });
+    if (sp)
+      inviteData.push({ sessionId, sessionPlayerId: sp.id, linkId: link.id, inviteeId: link.ownerUserId });
   }
 
   if (inviteData.length === 0) return;
@@ -115,8 +116,8 @@ export async function generateSessionInvites(
         update: {},
         create: d,
         include: { sessionPlayer: { select: { buyIn: true, cashOut: true, profit: true } } },
-      })
-    )
+      }),
+    ),
   );
 
   await Promise.all(
@@ -134,7 +135,7 @@ export async function generateSessionInvites(
           cashOut: invite.sessionPlayer.cashOut,
           profit: invite.sessionPlayer.profit,
         },
-      })
-    )
+      }),
+    ),
   );
 }

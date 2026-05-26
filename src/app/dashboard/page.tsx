@@ -42,7 +42,7 @@ export default async function DashboardPage({
 
   const eventId = eventParam ? Number(eventParam) : null;
 
-  const [raw, rawEvents] = await Promise.all([
+  const [raw, rawAccepted, rawEvents] = await Promise.all([
     prisma.session.findMany({
       where: { userId },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
@@ -53,31 +53,62 @@ export default async function DashboardPage({
         },
       },
     }),
+    prisma.acceptedSession.findMany({
+      where: { userId },
+      include: {
+        session: { select: { date: true, location: true, notes: true, buyIn: true, cashOut: true, profit: true } },
+        invite: {
+          select: {
+            sessionPlayer: { select: { buyIn: true, cashOut: true, profit: true } },
+            session: { select: { buyIn: true, cashOut: true, profit: true } },
+          },
+        },
+      },
+    }),
     prisma.event.findMany({
       where: { userId },
       orderBy: { startDate: "desc" },
     }),
   ]);
 
-  const allSessions: SessionWithPlayers[] = raw.map((s) => ({
-    id: s.id,
-    date: s.date.toISOString(),
-    location: s.location,
-    notes: s.notes,
-    buyIn: s.buyIn,
-    cashOut: s.cashOut,
-    profit: s.profit,
-    createdAt: s.createdAt.toISOString(),
-    updatedAt: s.updatedAt.toISOString(),
-    players: s.players.map((sp) => ({
-      id: sp.id,
-      playerId: sp.playerId,
-      playerName: sp.player.name,
-      buyIn: sp.buyIn,
-      cashOut: sp.cashOut,
-      profit: sp.profit,
+  const allSessions: SessionWithPlayers[] = [
+    ...raw.map((s) => ({
+      id: s.id,
+      date: s.date.toISOString(),
+      location: s.location,
+      notes: s.notes,
+      buyIn: s.buyIn,
+      cashOut: s.cashOut,
+      profit: s.profit,
+      createdAt: s.createdAt.toISOString(),
+      updatedAt: s.updatedAt.toISOString(),
+      players: s.players.map((sp) => ({
+        id: sp.id,
+        playerId: sp.playerId,
+        playerName: sp.player.name,
+        buyIn: sp.buyIn,
+        cashOut: sp.cashOut,
+        profit: sp.profit,
+      })),
     })),
-  }));
+    ...rawAccepted.map((a) => {
+      const sp = a.invite.sessionPlayer;
+      const src = a.invite.session;
+      return {
+        id: a.id,
+        date: a.session.date.toISOString(),
+        location: a.session.location,
+        notes: a.session.notes,
+        buyIn: sp?.buyIn ?? src?.buyIn ?? 0,
+        cashOut: sp?.cashOut ?? src?.cashOut ?? 0,
+        profit: sp?.profit ?? src?.profit ?? 0,
+        createdAt: a.createdAt.toISOString(),
+        updatedAt: a.updatedAt.toISOString(),
+        players: [],
+        isAcceptedRef: true as const,
+      };
+    }),
+  ];
 
   const events: PokerEvent[] = (rawEvents as EventModel[]).map((e) => ({
     id: e.id,

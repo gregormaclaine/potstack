@@ -119,7 +119,7 @@ export function buildDashboardStats(
     .sort((a, b) => b.sessions - a.sessions)
     .slice(0, 5);
 
-  const recentSessions = [...sorted].reverse().slice(0, 5);
+  const recentSessions = [...sorted].reverse().filter((s) => !s.isAcceptedRef).slice(0, 5);
 
   return {
     totalSessions,
