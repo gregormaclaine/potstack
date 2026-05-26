@@ -49,24 +49,37 @@ function SessionRow({ session, onEdit, onDelete, onRemove }: {
     <tr className="block bg-zinc-950 transition-colors hover:bg-zinc-900/50 sm:table-row">
       <td className="block px-4 pt-3 pb-0 sm:table-cell sm:py-3 sm:pb-3">
         <div className="flex items-center justify-between sm:block">
-          <span className="text-sm text-zinc-300">{formatDate(session.date)}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-zinc-300">{formatDate(session.date)}</span>
+            {!isOwned && (() => {
+              const inviterUsername = session.players.find(p => p.isInviter)?.linkedUsername;
+              if (!inviterUsername) return null;
+              return (
+                <span className="group relative inline-flex cursor-default items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-zinc-600 group-hover:text-zinc-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M15 8a3 3 0 1 0-2.977-2.63l-4.94 2.47a3 3 0 1 0 0 4.319l4.94 2.47a3 3 0 1 0 .895-1.789l-4.94-2.47a3.027 3.027 0 0 0 0-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+                  </svg>
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 opacity-0 transition-opacity group-hover:opacity-100">
+                    shared by @{inviterUsername}
+                  </span>
+                </span>
+              );
+            })()}
+          </div>
           <span className="sm:hidden"><Badge value={session.profit} /></span>
         </div>
       </td>
       <td className="block px-4 py-1 text-sm text-zinc-400 sm:table-cell sm:py-3">
         {session.location ?? <span className="text-zinc-600">—</span>}
-        {isOwned
-          ? (() => {
-              const groups = getSessionPredominantGroups(session.players);
-              if (groups.length === 0) return null;
-              return (
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {groups.map((g: SessionGroupLabel) => <GroupChip key={g.id ?? "ungrouped"} group={g} />)}
-                </div>
-              );
-            })()
-          : <div className="mt-0.5 text-xs text-zinc-600">shared by @{session.players.find(p => p.isInviter)?.linkedUsername}</div>
-        }
+        {(() => {
+          const groups = getSessionPredominantGroups(session.players);
+          if (groups.length === 0) return null;
+          return (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {groups.map((g: SessionGroupLabel) => <GroupChip key={g.id ?? "ungrouped"} group={g} />)}
+            </div>
+          );
+        })()}
       </td>
       <td className="hidden px-4 py-3 text-right text-sm text-zinc-400 sm:table-cell">{opponentCount}</td>
       <td className="hidden px-4 py-3 text-right text-sm text-zinc-400 sm:table-cell">{formatCurrency(session.buyIn)}</td>
@@ -84,9 +97,10 @@ function SessionRow({ session, onEdit, onDelete, onRemove }: {
           <Link href={isOwned ? `/sessions/${session.id}` : `/accepted-sessions/${session.id}`}>
             <Button size="sm" variant="ghost">View</Button>
           </Link>
-          {isOwned && (
-            <Button size="sm" variant="secondary" onClick={() => onEdit(session.id)}>Edit</Button>
-          )}
+          {isOwned
+            ? <Button size="sm" variant="secondary" onClick={() => onEdit(session.id)}>Edit</Button>
+            : <Button size="sm" variant="secondary" disabled>Edit</Button>
+          }
           <Button
             size="sm"
             variant="danger"

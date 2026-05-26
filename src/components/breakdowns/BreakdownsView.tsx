@@ -71,19 +71,13 @@ function SortHeader({
   );
 }
 
-export default function BreakdownsView({
-  sessions,
-  playerMetas,
-  playerGroupMap,
-  groups,
-}: BreakdownsViewProps) {
+export default function BreakdownsView({ sessions, playerGroupMap, groups }: BreakdownsViewProps) {
   const { formatCurrency } = useFormatCurrency();
   const statsEnabled = useFeatureFlagEnabled('stats-analysis-page');
   const [mode, setMode] = useState<'player' | 'group'>('player');
   const [sortKey, setSortKey] = useState<SortKey>('sessions');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  const playerMetaMap = useMemo(() => new Map(playerMetas), [playerMetas]);
   const playerGroupMapObj = useMemo(
     () => new Map(Object.entries(playerGroupMap).map(([k, v]) => [Number(k), v])),
     [playerGroupMap],
