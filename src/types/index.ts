@@ -74,7 +74,7 @@ export interface SessionWithPlayers {
 export interface UnifiedSessionPlayer {
   playerId: number | null;
   playerName: string;
-  group?: { id: number; name: string; color: string } | null;
+  group: { id: number; name: string; color: string } | null;
   buyIn: number | null;
   cashOut: number | null;
   profit: number | null;
@@ -82,6 +82,7 @@ export interface UnifiedSessionPlayer {
   linkedUsername: string | null;
   /** How the player was resolved to this user's records; null for owned sessions. */
   resolvedVia: 'playerLink' | 'equivalence' | null;
+  /** Indicates if the player is the original creator of the session for accepted sessions. */
   isInviter: boolean;
 }
 
