@@ -3,11 +3,13 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { fetchOwnedSessionDetail } from "@/lib/session-detail";
+import { fetchAdjacentSessions } from "@/lib/adjacent-sessions";
 import PageWrapper from "@/components/layout/PageWrapper";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import DeleteSessionButton from "./DeleteSessionButton";
 import SharePlayerButton from "@/components/sessions/SharePlayerButton";
+import SessionNav from "@/components/sessions/SessionNav";
 import { formatDate } from "@/lib/formatters";
 import CurrencyValue from "@/components/ui/CurrencyValue";
 import { clsx } from "clsx";
@@ -22,7 +24,10 @@ export default async function SessionDetailPage({ params }: PageProps) {
 
   const { id } = await params;
 
-  const session = await fetchOwnedSessionDetail(Number(id), userId);
+  const [session, adjacent] = await Promise.all([
+    fetchOwnedSessionDetail(Number(id), userId),
+    fetchAdjacentSessions(Number(id), 'owned', userId),
+  ]);
 
   if (!session) notFound();
 
@@ -245,6 +250,7 @@ export default async function SessionDetailPage({ params }: PageProps) {
           <Button variant="ghost" size="sm">← Back to Sessions</Button>
         </Link>
       </div>
+      <SessionNav prev={adjacent.prev} next={adjacent.next} />
     </PageWrapper>
   );
 }
