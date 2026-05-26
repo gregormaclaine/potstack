@@ -98,7 +98,7 @@ export function buildDashboardStats(
   >();
   for (const session of sorted) {
     for (const sp of session.players) {
-      if (sp.isMe) continue;
+      if (sp.playerId === null) continue;
       const existing = playerMap.get(sp.playerId!);
       if (existing) {
         existing.sessions += 1;

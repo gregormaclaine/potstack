@@ -20,68 +20,43 @@ export interface ResolutionResult {
 }
 
 /**
- * For a given session invite, resolve all session players (excluding the player
- * that represents the invitee in the session creator's account) into:
- *  - resolved: players automatically matched to the invitee's own player records
- *  - unresolved: players that need manual mapping
- *
- * Works for both link directions:
- *  - Original: ownerUser created session, linkedUser is invitee → exclude ownerPlayerId
- *  - Reversed: linkedUser created session, ownerUser is invitee → exclude linkedPlayerId
+ * Resolves all session players (excluding the invitee's own session player) into
+ * resolved (auto-matched) and unresolved (needs manual mapping) lists.
  *
  * Resolution order:
- *  1. PlayerLink graph — if the session creator's player is linked to user X, and the
- *     invitee also has an accepted link with user X, use the invitee's player for X
- *  2. PlayerEquivalence keyed by (fromPlayerId, linkId) — remembered manual mappings
+ *  1. PlayerLink graph — if a session player is linked to a real user and the invitee
+ *     also has an accepted link with that user, auto-resolve to the invitee's player.
+ *  2. PlayerEquivalence keyed by (fromPlayerId, linkId) — remembered manual mappings.
  */
 export async function resolveSessionPlayers(
-  inviteId: number,
-  inviteeUserId: number
+  linkId: number,
+  sessionPlayerId: number,
+  sessionId: number,
+  inviteeUserId: number,
 ): Promise<ResolutionResult> {
-  const invite = await prisma.sessionInvite.findUnique({
-    where: { id: inviteId },
-    include: {
-      link: { select: { id: true, ownerPlayerId: true, linkedPlayerId: true, ownerUserId: true, linkedUserId: true } },
-      session: {
-        include: {
-          players: {
-            include: { player: { select: { id: true, name: true } } },
-          },
-        },
-      },
-    },
-  });
+  const [link, sessionPlayers] = await Promise.all([
+    prisma.playerLink.findUnique({
+      where: { id: linkId },
+      select: { id: true, ownerPlayerId: true, linkedPlayerId: true, ownerUserId: true, linkedUserId: true },
+    }),
+    prisma.sessionPlayer.findMany({
+      where: { sessionId },
+      include: { player: { select: { id: true, name: true } } },
+    }),
+  ]);
 
-  if (!invite) return { resolved: [], unresolved: [] };
+  if (!link) return { resolved: [], unresolved: [] };
 
-  const linkId = invite.link.id as number;
-
-  // Determine which player in the session represents the invitee (to exclude from resolution).
-  // Original direction: ownerUser invited linkedUser → invitee's player = ownerPlayerId
-  // Reversed direction: linkedUser invited ownerUser → invitee's player = linkedPlayerId
-  const inviteeIsOwner = inviteeUserId === (invite.link.ownerUserId as number);
-  const excludePlayerId = inviteeIsOwner
-    ? (invite.link.linkedPlayerId as number | null)
-    : (invite.link.ownerPlayerId as number);
-
-  // All session players except the one representing the invitee
-  const otherPlayers = invite.session.players.filter(
-    (sp) => sp.playerId !== excludePlayerId
-  );
+  const otherPlayers = sessionPlayers.filter(sp => sp.id !== sessionPlayerId);
 
   if (otherPlayers.length === 0) return { resolved: [], unresolved: [] };
 
   const otherPlayerIds = otherPlayers.map((sp) => sp.playerId);
 
   // 1. Try the PlayerLink graph for all session players.
-  //    A player in the session may be linked to a real user account. If the invitee
-  //    also has an accepted link with that user, we can auto-resolve.
   const linkGraphResolved = new Map<number, { id: number; name: string; username: string }>();
 
   {
-    // A creator's player may be linked to a real user in either direction:
-    //   Direction A: creator is ownerUser — their player is ownerPlayerId, real user is linkedUserId
-    //   Direction B: creator is linkedUser — their player is linkedPlayerId, real user is ownerUserId
     const [theirLinksAsOwner, theirLinksAsLinked] = await Promise.all([
       prisma.playerLink.findMany({
         where: { ownerPlayerId: { in: otherPlayerIds }, status: "ACCEPTED" },
@@ -93,7 +68,6 @@ export async function resolveSessionPlayers(
       }),
     ]);
 
-    // Build a unified map: playerIdInCreatorsSession → real userId it belongs to
     const playerToRealUser = new Map<number, number>();
     for (const tl of theirLinksAsOwner) {
       playerToRealUser.set(tl.ownerPlayerId, tl.linkedUserId);
@@ -107,7 +81,6 @@ export async function resolveSessionPlayers(
     if (playerToRealUser.size > 0) {
       const theirUserIds = Array.from(new Set(playerToRealUser.values()));
 
-      // Find invitee's links (in either direction) with those users
       const myLinks = await prisma.playerLink.findMany({
         where: {
           status: "ACCEPTED",
@@ -124,21 +97,17 @@ export async function resolveSessionPlayers(
         },
       });
 
-      // Build a map: otherUserId → invitee's player + the other user's username
       const myPlayerForUser = new Map<number, { id: number; name: string; username: string }>();
       for (const ml of myLinks) {
         if (ml.ownerUserId === inviteeUserId) {
-          // I sent the link → my player is ownerPlayer, other user is linkedUserId
           myPlayerForUser.set(ml.linkedUserId, { ...ml.ownerPlayer, username: ml.linkedUser.username });
         } else {
-          // I received the link → my player is linkedPlayer, other user is ownerUserId
           if (ml.linkedPlayer) {
             myPlayerForUser.set(ml.ownerUserId, { ...ml.linkedPlayer, username: ml.ownerUser.username });
           }
         }
       }
 
-      // Map back: fromPlayerId → invitee's player + linked username (via the real user)
       for (const [playerId, realUserId] of playerToRealUser) {
         const myPlayer = myPlayerForUser.get(realUserId);
         if (myPlayer) {
@@ -148,7 +117,7 @@ export async function resolveSessionPlayers(
     }
   }
 
-  // 2. For players not resolved via link graph, check PlayerEquivalence (remembered manual mappings).
+  // 2. For players not resolved via link graph, check PlayerEquivalence.
   const linkGraphUnresolved = otherPlayerIds.filter((id) => !linkGraphResolved.has(id));
   const equivalenceMap = new Map<number, { id: number; name: string }>();
 

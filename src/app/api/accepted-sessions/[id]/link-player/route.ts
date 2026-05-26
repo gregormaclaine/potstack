@@ -26,7 +26,7 @@ export async function POST(
 
   const accepted = await prisma.acceptedSession.findUnique({
     where: { id: Number(id) },
-    include: { invite: { select: { linkId: true } } },
+    select: { userId: true, linkId: true },
   });
 
   if (!accepted) {
@@ -61,8 +61,8 @@ export async function POST(
   }
 
   await prisma.playerEquivalence.upsert({
-    where: { fromPlayerId_linkId: { fromPlayerId: body.fromPlayerId, linkId: accepted.invite.linkId } },
-    create: { fromPlayerId: body.fromPlayerId, toPlayerId, linkId: accepted.invite.linkId },
+    where: { fromPlayerId_linkId: { fromPlayerId: body.fromPlayerId, linkId: accepted.linkId } },
+    create: { fromPlayerId: body.fromPlayerId, toPlayerId, linkId: accepted.linkId },
     update: { toPlayerId },
   });
 

@@ -162,9 +162,10 @@ export default function GroupSessionsView({
     return dateFilteredSessions.filter((s) =>
       s.players.every(
         (sp) =>
-          sp.isMe ||
-          playerGroupMapObj.get(sp.playerId!) === selectedGroupId ||
-          extraPlayerIdSet.has(sp.playerId!)
+          sp.playerId !== null && (
+            playerGroupMapObj.get(sp.playerId) === selectedGroupId ||
+            extraPlayerIdSet.has(sp.playerId)
+          )
       )
     );
   }, [dateFilteredSessions, strictMode, selectedGroupId, playerGroupMapObj, extraPlayerIdSet]);

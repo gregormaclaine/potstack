@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { fetchOwnedSessionDetail } from "@/lib/session-detail";
 import PageWrapper from "@/components/layout/PageWrapper";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
@@ -21,16 +22,7 @@ export default async function SessionDetailPage({ params }: PageProps) {
 
   const { id } = await params;
 
-  const session = await prisma.session.findUnique({
-    where: { id: Number(id), userId },
-    include: {
-      players: {
-        include: { player: { select: { name: true } } },
-        orderBy: { player: { name: "asc" } },
-      },
-      invites: { select: { status: true } },
-    },
-  });
+  const session = await fetchOwnedSessionDetail(Number(id), userId);
 
   if (!session) notFound();
 

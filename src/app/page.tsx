@@ -54,12 +54,12 @@ const topPlayers: TopPlayer[] = [
 ];
 
 function player(playerId: number, playerName: string, buyIn: number, cashOut: number, profit: number) {
-  return { playerId, playerName, group: null, buyIn, cashOut, profit, isMe: false as const, linkedUsername: null, resolvedVia: null };
+  return { playerId, playerName, group: null, buyIn, cashOut, profit, isInviter: false as const, linkedUsername: null, resolvedVia: null };
 }
 
 const recentSessions: UnifiedSession[] = [
   {
-    id: 1, sessionId: 1, source: "owned", inviterUsername: null,
+    id: 1, sessionId: 1, source: "owned",
     date: "2025-12-15T00:00:00.000Z", location: "Home Game", notes: null,
     buyIn: 50, cashOut: 230, profit: 180,
     createdAt: "2025-12-15T20:00:00.000Z", updatedAt: "2025-12-15T20:00:00.000Z",
@@ -70,14 +70,14 @@ const recentSessions: UnifiedSession[] = [
     ],
   },
   {
-    id: 2, sessionId: 2, source: "owned", inviterUsername: null,
+    id: 2, sessionId: 2, source: "owned",
     date: "2025-12-08T00:00:00.000Z", location: "Casino", notes: null,
     buyIn: 100, cashOut: 5, profit: -95,
     createdAt: "2025-12-08T22:00:00.000Z", updatedAt: "2025-12-08T22:00:00.000Z",
     players: [player(4, "Morgan", 100, 150, 50)],
   },
   {
-    id: 3, sessionId: 3, source: "owned", inviterUsername: null,
+    id: 3, sessionId: 3, source: "owned",
     date: "2025-12-01T00:00:00.000Z", location: "Home Game", notes: null,
     buyIn: 50, cashOut: 330, profit: 280,
     createdAt: "2025-12-01T21:30:00.000Z", updatedAt: "2025-12-01T21:30:00.000Z",
@@ -87,14 +87,14 @@ const recentSessions: UnifiedSession[] = [
     ],
   },
   {
-    id: 4, sessionId: 4, source: "owned", inviterUsername: null,
+    id: 4, sessionId: 4, source: "owned",
     date: "2025-11-24T00:00:00.000Z", location: "Pub Night", notes: null,
     buyIn: 20, cashOut: -15, profit: -35,
     createdAt: "2025-11-24T19:00:00.000Z", updatedAt: "2025-11-24T19:00:00.000Z",
     players: [player(2, "Sam", 20, 55, 35)],
   },
   {
-    id: 5, sessionId: 5, source: "owned", inviterUsername: null,
+    id: 5, sessionId: 5, source: "owned",
     date: "2025-11-17T00:00:00.000Z", location: "Home Game", notes: null,
     buyIn: 50, cashOut: 110, profit: 60,
     createdAt: "2025-11-17T20:00:00.000Z", updatedAt: "2025-11-17T20:00:00.000Z",
@@ -107,7 +107,7 @@ const recentSessions: UnifiedSession[] = [
 
 function s(id: number, date: string, buyIn: number, profit: number): UnifiedSession {
   return {
-    id, sessionId: id, source: "owned", inviterUsername: null,
+    id, sessionId: id, source: "owned",
     date: `${date}T00:00:00.000Z`, location: null, notes: null,
     buyIn, cashOut: buyIn + profit, profit,
     createdAt: `${date}T20:00:00.000Z`, updatedAt: `${date}T20:00:00.000Z`,

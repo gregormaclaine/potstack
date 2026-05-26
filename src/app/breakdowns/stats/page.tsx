@@ -32,9 +32,6 @@ export default async function BreakdownStatsPage() {
     }),
   ]);
 
-  const playerMetas = new Map(
-    rawPlayers.map((p: RawPlayer) => [p.id, { name: p.name, group: p.group }])
-  );
   const playerGroupMap = new Map(
     rawPlayers
       .filter((p: RawPlayer) => p.groupId !== null)
@@ -42,7 +39,7 @@ export default async function BreakdownStatsPage() {
   );
   const groups: PlayerGroup[] = rawGroups;
 
-  const playerRows: PlayerBreakdownRow[] = buildPlayerBreakdowns(sessions, playerMetas);
+  const playerRows: PlayerBreakdownRow[] = buildPlayerBreakdowns(sessions);
   const groupRows: GroupBreakdownRow[] = buildGroupBreakdowns(sessions, groups, playerGroupMap);
 
   const breakdownStats: BreakdownStatsItem[] = rawStats.map((r) => ({

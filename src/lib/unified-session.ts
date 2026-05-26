@@ -298,6 +298,78 @@ async function buildAcceptedSessions(rawAccepted: RawAccepted[], userId: number)
   return rawAccepted.map(raw => mapAcceptedSession(raw, userId, linkGraphResolved, equivalenceMap));
 }
 
+const acceptedSessionInclude = {
+  session: {
+    select: {
+      date: true,
+      location: true,
+      notes: true,
+      buyIn: true,
+      cashOut: true,
+      profit: true,
+      user: { select: { username: true } },
+      players: {
+        select: {
+          playerId: true,
+          buyIn: true,
+          cashOut: true,
+          profit: true,
+          player: { select: { name: true } },
+        },
+      },
+    },
+  },
+  sessionPlayer: { select: { buyIn: true, cashOut: true, profit: true } },
+  link: {
+    select: {
+      id: true,
+      ownerUserId: true,
+      ownerPlayerId: true,
+      linkedUserId: true,
+      linkedPlayerId: true,
+      ownerPlayer: {
+        select: { id: true, name: true, group: { select: { id: true, name: true, color: true } } },
+      },
+      linkedPlayer: {
+        select: { id: true, name: true, group: { select: { id: true, name: true, color: true } } },
+      },
+    },
+  },
+} as const;
+
+export async function fetchPagedForUser(
+  userId: number,
+  page: number,
+  limit: number,
+): Promise<{ sessions: UnifiedSession[]; total: number }> {
+  const [total, rawSessions, rawAccepted] = await Promise.all([
+    prisma.session.count({ where: { userId } }),
+    prisma.session.findMany({
+      where: { userId },
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+      skip: (page - 1) * limit,
+      take: limit,
+      include: playerInclude,
+    }),
+    prisma.acceptedSession.findMany({
+      where: { userId },
+      orderBy: [{ session: { date: 'desc' } }],
+      include: acceptedSessionInclude,
+    }),
+  ]);
+
+  const owned = rawSessions.map(mapOwnedSession);
+  const accepted = await buildAcceptedSessions(rawAccepted, userId);
+
+  const sessions = [...owned, ...accepted].sort((a, b) => {
+    const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+    if (dateDiff !== 0) return dateDiff;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  return { sessions, total };
+}
+
 export async function fetchAllForUser(userId: number): Promise<UnifiedSession[]> {
   const [rawSessions, rawAccepted] = await Promise.all([
     prisma.session.findMany({
@@ -307,44 +379,7 @@ export async function fetchAllForUser(userId: number): Promise<UnifiedSession[]>
     }),
     prisma.acceptedSession.findMany({
       where: { userId },
-      include: {
-        session: {
-          select: {
-            date: true,
-            location: true,
-            notes: true,
-            buyIn: true,
-            cashOut: true,
-            profit: true,
-            user: { select: { username: true } },
-            players: {
-              select: {
-                playerId: true,
-                buyIn: true,
-                cashOut: true,
-                profit: true,
-                player: { select: { name: true } },
-              },
-            },
-          },
-        },
-        sessionPlayer: { select: { buyIn: true, cashOut: true, profit: true } },
-        link: {
-          select: {
-            id: true,
-            ownerUserId: true,
-            ownerPlayerId: true,
-            linkedUserId: true,
-            linkedPlayerId: true,
-            ownerPlayer: {
-              select: { id: true, name: true, group: { select: { id: true, name: true, color: true } } },
-            },
-            linkedPlayer: {
-              select: { id: true, name: true, group: { select: { id: true, name: true, color: true } } },
-            },
-          },
-        },
-      },
+      include: acceptedSessionInclude,
     }),
   ]);
 

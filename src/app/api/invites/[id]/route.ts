@@ -141,7 +141,7 @@ export async function PATCH(
   // ── Accept: create an AcceptedSession reference (no data duplication) ────────
   const accepted = await prisma.$transaction(async (tx) => {
     const record = await tx.acceptedSession.create({
-      data: { userId, sessionId: invite.sessionId, inviteId: Number(id) },
+      data: { userId, sessionId: invite.sessionId, inviteId: Number(id), sessionPlayerId: invite.sessionPlayerId, linkId: invite.linkId },
     });
     await tx.sessionInvite.update({
       where: { id: Number(id) },

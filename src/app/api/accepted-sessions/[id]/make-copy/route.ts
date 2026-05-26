@@ -24,14 +24,8 @@ export async function POST(
           players: true,
         },
       },
-      invite: {
-        select: {
-          id: true,
-          sessionPlayerId: true,
-          linkId: true,
-          link: { select: { ownerUserId: true, ownerPlayerId: true, linkedPlayerId: true } },
-        },
-      },
+      sessionPlayer: { select: { playerId: true } },
+      link: { select: { ownerUserId: true, ownerPlayerId: true, linkedPlayerId: true } },
     },
   });
 
@@ -43,16 +37,15 @@ export async function POST(
   }
 
   const src = accepted.session;
-  const invite = accepted.invite;
 
   // Get invitee's own SessionPlayer row (their buy-in/profit in the original session)
-  const mySessionPlayer = src.players.find((sp) => sp.id === invite.sessionPlayerId);
+  const mySessionPlayer = src.players.find((sp) => sp.id === accepted.sessionPlayerId);
   const myBuyIn   = mySessionPlayer?.buyIn   ?? src.buyIn;
   const myCashOut = mySessionPlayer?.cashOut ?? src.cashOut;
   const myProfit  = mySessionPlayer?.profit  ?? src.profit;
 
   // Resolve all other players via equivalences and link graph
-  const { resolved } = await resolveSessionPlayers(invite.id, userId);
+  const { resolved } = await resolveSessionPlayers(accepted.linkId, accepted.sessionPlayerId, accepted.sessionId, userId);
   const resolvedMap = new Map(resolved.map((r) => [r.fromPlayerId, r.toPlayerId]));
 
   // Build SessionPlayer rows for the copy (resolved players only; unresolved are skipped)
@@ -62,14 +55,14 @@ export async function POST(
 
   const additionalPlayers: Array<{ playerId: number; buyIn: number | null; cashOut: number | null; profit: number | null }> = [];
   for (const [fromPlayerId, toPlayerId] of resolvedMap) {
-    if (fromPlayerId === mySessionPlayer?.playerId) continue;
+    if (fromPlayerId === accepted.sessionPlayer.playerId) continue;
     const orig = originalPlayerMap.get(fromPlayerId);
     additionalPlayers.push({ playerId: toPlayerId, buyIn: orig?.buyIn ?? null, cashOut: orig?.cashOut ?? null, profit: orig?.profit ?? null });
   }
 
   // Also add the session creator as a player using their mapped player in invitee's account
-  const inviteeIsOwner = userId === invite.link.ownerUserId;
-  const creatorMappedPlayerId = inviteeIsOwner ? invite.link.linkedPlayerId : invite.link.ownerPlayerId;
+  const inviteeIsOwner = userId === accepted.link.ownerUserId;
+  const creatorMappedPlayerId = inviteeIsOwner ? accepted.link.linkedPlayerId : accepted.link.ownerPlayerId;
   if (creatorMappedPlayerId) {
     additionalPlayers.push({ playerId: creatorMappedPlayerId, buyIn: src.buyIn, cashOut: src.cashOut, profit: src.profit });
   }

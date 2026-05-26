@@ -28,7 +28,7 @@ export async function GET(
           user: { select: { username: true } },
         },
       },
-      invite: { select: { id: true, sessionPlayerId: true } },
+      sessionPlayer: { select: { id: true } },
     },
   });
 
@@ -39,11 +39,11 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { resolved } = await resolveSessionPlayers(accepted.invite.id, userId);
+  const { resolved } = await resolveSessionPlayers(accepted.linkId, accepted.sessionPlayerId, accepted.sessionId, userId);
   const resolvedMap = new Map(resolved.map((r) => [r.fromPlayerId, r]));
 
   const players: AcceptedSessionPlayer[] = accepted.session.players.map((sp) => {
-    const isMe = sp.id === accepted.invite.sessionPlayerId;
+    const isMe = sp.id === accepted.sessionPlayerId;
     const match = resolvedMap.get(sp.playerId);
     return {
       fromPlayerId: sp.playerId,
@@ -96,10 +96,12 @@ export async function DELETE(
 
   await prisma.$transaction(async (tx) => {
     await tx.acceptedSession.delete({ where: { id: Number(id) } });
-    await tx.sessionInvite.update({
-      where: { id: accepted.inviteId },
-      data: { status: "DISMISSED" },
-    });
+    if (accepted.inviteId !== null) {
+      await tx.sessionInvite.update({
+        where: { id: accepted.inviteId },
+        data: { status: "DISMISSED" },
+      });
+    }
   });
 
   captureEvent(userSession.user.name ?? `userId[${userId}]`, "accepted session dismissed", {

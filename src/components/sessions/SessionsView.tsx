@@ -43,7 +43,7 @@ function SessionRow({ session, onEdit, onDelete, onRemove }: {
 }) {
   const { formatCurrency } = useFormatCurrency();
   const isOwned = session.source === "owned";
-  const opponentCount = session.players.filter((p) => !p.isMe).length;
+  const opponentCount = session.players.length;
 
   return (
     <tr className="block bg-zinc-950 transition-colors hover:bg-zinc-900/50 sm:table-row">
@@ -65,7 +65,7 @@ function SessionRow({ session, onEdit, onDelete, onRemove }: {
                 </div>
               );
             })()
-          : <div className="mt-0.5 text-xs text-zinc-600">shared by @{session.inviterUsername}</div>
+          : <div className="mt-0.5 text-xs text-zinc-600">shared by @{session.players.find(p => p.isInviter)?.linkedUsername}</div>
         }
       </td>
       <td className="hidden px-4 py-3 text-right text-sm text-zinc-400 sm:table-cell">{opponentCount}</td>

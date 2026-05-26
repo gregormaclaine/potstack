@@ -21,11 +21,6 @@ const PLAYER_LINE_COLORS: string[] = [
   '#e879f9', // fuchsia
 ];
 
-interface PlayerMeta {
-  name: string;
-  group: PlayerGroup | null;
-}
-
 function buildRow(
   sessions: UnifiedSession[],
 ): Omit<PlayerBreakdownRow | GroupBreakdownRow, 'playerId' | 'groupId' | 'name' | 'color' | 'group'> {
@@ -220,7 +215,9 @@ export function getSessionsForGroup(
   groupId: number,
   playerGroupMap: Map<number, number>,
 ): UnifiedSession[] {
-  return sessions.filter(s => s.players.some(sp => !sp.isMe && playerGroupMap.get(sp.playerId!) === groupId));
+  return sessions.filter(s =>
+    s.players.some(sp => sp.playerId !== null && playerGroupMap.get(sp.playerId) === groupId),
+  );
 }
 
 export interface GroupSessionPlayerRow {
@@ -283,9 +280,9 @@ export function buildGroupSessionPlayerRows(
 
   for (const session of filteredSessions) {
     for (const sp of session.players) {
-      if (sp.isMe) continue;
-      if (playerGroupMap.get(sp.playerId!) !== groupId && !extraPlayerIds.has(sp.playerId!)) continue;
-      const existing = opponentMap.get(sp.playerId!);
+      if (sp.playerId === null) continue;
+      if (playerGroupMap.get(sp.playerId) !== groupId && !extraPlayerIds.has(sp.playerId)) continue;
+      const existing = opponentMap.get(sp.playerId);
       if (existing) {
         existing.appearances++;
         if (sp.buyIn !== null) existing.buyIns.push(sp.buyIn);
@@ -347,8 +344,8 @@ export function buildCumulativeByPlayer(
 
   for (const session of filteredSessions) {
     for (const sp of session.players) {
-      if (sp.isMe) continue;
-      if (playerGroupMap.get(sp.playerId!) !== groupId && !extraPlayerIds.has(sp.playerId!)) continue;
+      if (sp.playerId === null) continue;
+      if (playerGroupMap.get(sp.playerId) !== groupId && !extraPlayerIds.has(sp.playerId)) continue;
       const key = `player_${sp.playerId}`;
       if (!nameMap.has(key)) {
         allKeys.push(key);
@@ -417,14 +414,17 @@ export function buildGroupSessionDetails(
     const isGroupMember = (playerId: number) =>
       playerGroupMap.get(playerId) === groupId || extraPlayerIds.has(playerId);
 
-    const opponents = session.players.filter(sp => !sp.isMe);
-    const nonGroupPlayers = opponents.filter(sp => !isGroupMember(sp.playerId!)).length;
+    const nonGroupPlayers = session.players.filter(
+      sp => sp.playerId === null || !isGroupMember(sp.playerId),
+    ).length;
 
     const totalOnTable = session.players.filter(p => p.buyIn !== null).reduce((sum, p) => sum + p.buyIn!, 0);
 
-    const groupNetRaw = session.players
-      .filter(p => p.profit !== null && (p.isMe || (p.playerId !== null && isGroupMember(p.playerId))))
-      .reduce((sum, p) => sum + p.profit!, 0);
+    const groupNetRaw =
+      session.profit +
+      session.players
+        .filter(p => p.profit !== null && p.playerId !== null && isGroupMember(p.playerId))
+        .reduce((sum, p) => sum + p.profit!, 0);
     const groupNet = Math.round(groupNetRaw * 100) / 100;
 
     return {
