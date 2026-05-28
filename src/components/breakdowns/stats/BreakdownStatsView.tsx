@@ -6,12 +6,15 @@ import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import WinRateCIChart from "@/components/breakdowns/stats/WinRateCIChart";
 import ProfitProbChart from "@/components/breakdowns/stats/ProfitProbChart";
+import LinearAffectsChart from "@/components/breakdowns/stats/LinearAffectsChart";
 import { formatPercent } from "@/lib/formatters";
+import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type {
   PlayerBreakdownRow,
   GroupBreakdownRow,
   BreakdownStatsItem,
 } from "@/types";
+import type { LinearAffectsModelResult } from "@/lib/computeLinearAffects";
 
 const REFRESH_RATE_LIMIT_MS = 10 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -21,6 +24,8 @@ interface BreakdownStatsViewProps {
   groupRows: GroupBreakdownRow[];
   breakdownStats: BreakdownStatsItem[];
   lastRefreshedAt: string | null;
+  linearStrict: LinearAffectsModelResult | null;
+  linearInclusive: LinearAffectsModelResult | null;
 }
 
 function formatRelativeTime(isoString: string): string {
@@ -134,11 +139,15 @@ export default function BreakdownStatsView({
   groupRows,
   breakdownStats,
   lastRefreshedAt,
+  linearStrict,
+  linearInclusive,
 }: BreakdownStatsViewProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [mode, setMode] = useState<"player" | "group">("player");
   const [currentLastRefreshedAt, setCurrentLastRefreshedAt] = useState(lastRefreshedAt);
+  const [includeRare, setIncludeRare] = useState(true);
+  const { formatCurrency, formatProfit } = useFormatCurrency();
 
   const statsMap = useMemo(() => {
     const m = new Map<string, BreakdownStatsItem>();
@@ -398,6 +407,161 @@ export default function BreakdownStatsView({
             <h2 className="text-lg font-semibold text-zinc-100">Full Numbers</h2>
             <DataTable rows={rows} mode={mode} statsMap={statsMap} />
           </section>
+
+          {/* ── Marginal Player Effects ───────────────────────────────────── */}
+          {(() => {
+            const currentLinear = includeRare ? linearInclusive : linearStrict;
+            return (
+              <section className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-zinc-100">Marginal Player Effects</h2>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    How much does each player&apos;s presence shift your expected profit? Each bar shows the
+                    linear model&apos;s estimated effect with a 90% confidence interval.
+                  </p>
+                </div>
+
+                <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-zinc-400">
+                  <input
+                    type="checkbox"
+                    checked={includeRare}
+                    onChange={e => setIncludeRare(e.target.checked)}
+                    className="h-4 w-4 rounded accent-emerald-500"
+                  />
+                  Include sessions with infrequent players
+                  <span className="text-zinc-600">(players with fewer than 3 sessions)</span>
+                </label>
+
+                {currentLinear === null ? (
+                  <div className="rounded-xl border border-dashed border-zinc-700 py-12 text-center">
+                    <p className="font-medium text-zinc-400">Not enough data to fit model</p>
+                    <p className="mt-2 text-sm text-zinc-500">
+                      The linear regression requires at least{" "}
+                      <span className="text-zinc-300">n + 1 sessions</span> where n is the number
+                      of qualifying players (those with ≥ 3 sessions). Try enabling the toggle
+                      above or add more sessions.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+                      <LinearAffectsChart data={currentLinear.players} />
+                    </div>
+
+                    <ExplainerCard title="OLS Linear Main-Effects Model">
+                      <p>
+                        This section estimates the{" "}
+                        <span className="text-zinc-200 font-medium">marginal effect</span> of each
+                        player on your session profit using{" "}
+                        <span className="text-zinc-200 font-medium">
+                          ordinary least-squares (OLS) regression
+                        </span>
+                        .
+                      </p>
+                      <p>
+                        The model is{" "}
+                        <span className="text-zinc-200 font-mono">
+                          Y = β₀ + β₁x₁ + … + βₙxₙ
+                        </span>
+                        , where Y is your profit and each xᵢ is 1 if player i was present, 0 if
+                        not. Only players with at least 3 sessions appear as features.
+                      </p>
+                      <p>
+                        Each bar shows the predicted profit when{" "}
+                        <span className="text-zinc-200 font-medium">
+                          only that one player is present
+                        </span>{" "}
+                        — formally, the model evaluated at the unit vector eᵢ. This is not the
+                        average profit when that player appears; it isolates their contribution
+                        while holding all others at zero.
+                      </p>
+                      <p>
+                        The whiskers are a{" "}
+                        <span className="text-zinc-200 font-medium">
+                          90% confidence interval for the mean response
+                        </span>{" "}
+                        (not a prediction interval for a single future session). A wide interval
+                        means few sessions with that player, or that they rarely appear
+                        independently of others.
+                      </p>
+                      <p>
+                        The{" "}
+                        <span className="text-zinc-200 font-medium">
+                          &ldquo;Include infrequent players&rdquo; toggle
+                        </span>{" "}
+                        controls whether sessions containing non-qualifying players (fewer than 3
+                        sessions) are included in the fit. Excluding them keeps the model cleaner
+                        but reduces the data available.
+                      </p>
+                      <p>
+                        The model assumes{" "}
+                        <span className="text-zinc-200 font-medium">additive effects</span> with no
+                        interaction terms. Treat estimates as indicative, not causal — a negative
+                        effect does not necessarily mean a player causes you to lose.
+                      </p>
+                    </ExplainerCard>
+
+                    <section className="space-y-3">
+                      <h3 className="text-base font-semibold text-zinc-100">Full Numbers</h3>
+                      <p className="text-xs text-zinc-500">
+                        N = {currentLinear.N} sessions · n = {currentLinear.n} players · σ̂ ={" "}
+                        {formatCurrency(currentLinear.sigma)}
+                      </p>
+                      <div className="overflow-x-auto rounded-xl border border-zinc-800">
+                        <table className="w-full min-w-max text-sm">
+                          <thead className="border-b border-zinc-800 bg-zinc-900">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                                Player
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
+                                Sessions Used
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
+                                Estimated Effect
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
+                                90% CI
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-800">
+                            {[...currentLinear.players]
+                              .sort((a, b) => b.mean - a.mean)
+                              .map(player => (
+                                <tr key={player.playerIds.join('-')} className="bg-zinc-950 hover:bg-zinc-900/40">
+                                  <td className="px-4 py-3 font-medium text-zinc-200">
+                                    {player.playerName}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-zinc-400">
+                                    {player.sessionCount}
+                                  </td>
+                                  <td
+                                    className={clsx(
+                                      "px-4 py-3 text-right font-medium",
+                                      player.mean > 0
+                                        ? "text-emerald-400"
+                                        : player.mean < 0
+                                          ? "text-rose-400"
+                                          : "text-zinc-400",
+                                    )}
+                                  >
+                                    {formatProfit(player.mean)}
+                                  </td>
+                                  <td className="px-4 py-3 text-right font-mono text-zinc-400">
+                                    {formatProfit(player.ciLow)} – {formatProfit(player.ciHigh)}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  </>
+                )}
+              </section>
+            );
+          })()}
         </>
       )}
     </div>

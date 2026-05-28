@@ -10,10 +10,12 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "@stdlib/stats-base-dists-t-quantile": "^0.2.3",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "force-graph": "^1.51.4",
+    "ml-matrix": "^6.12.2",
     "next": "16.2.3",
     "next-auth": "^5.0.0-beta.30",
     "posthog-js": "^1.369.0",

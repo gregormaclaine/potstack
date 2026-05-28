@@ -1,15 +1,16 @@
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
-import PageWrapper from "@/components/layout/PageWrapper";
-import BreakdownStatsView from "@/components/breakdowns/stats/BreakdownStatsView";
-import StatsPageGuard from "@/components/breakdowns/stats/StatsPageGuard";
-import { buildPlayerBreakdowns, buildGroupBreakdowns } from "@/lib/breakdowns";
-import { fetchAllForUser } from "@/lib/unified-session";
-import type { PlayerGroup, PlayerBreakdownRow, GroupBreakdownRow, BreakdownStatsItem } from "@/types";
+import { prisma } from '@/lib/prisma';
+import { auth } from '@/auth';
+import PageWrapper from '@/components/layout/PageWrapper';
+import BreakdownStatsView from '@/components/breakdowns/stats/BreakdownStatsView';
+import StatsPageGuard from '@/components/breakdowns/stats/StatsPageGuard';
+import { buildPlayerBreakdowns, buildGroupBreakdowns, getSessionsPerPlayer } from '@/lib/breakdowns';
+import { fetchAllForUser } from '@/lib/unified-session';
+import { computeLinearAffects } from '@/lib/computeLinearAffects';
+import type { PlayerGroup, PlayerBreakdownRow, GroupBreakdownRow, BreakdownStatsItem } from '@/types';
 
 type RawPlayer = { id: number; name: string; groupId: number | null; group: PlayerGroup | null };
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 export default async function BreakdownStatsPage() {
   const session = await auth();
@@ -23,7 +24,7 @@ export default async function BreakdownStatsPage() {
     }),
     prisma.playerGroup.findMany({
       where: { userId },
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
     }),
     prisma.breakdownStats.findMany({ where: { userId } }),
     prisma.user.findUnique({
@@ -35,15 +36,23 @@ export default async function BreakdownStatsPage() {
   const playerGroupMap = new Map(
     rawPlayers
       .filter((p: RawPlayer) => p.groupId !== null)
-      .map((p: RawPlayer) => [p.id, p.groupId as number])
+      .map((p: RawPlayer) => [p.id, p.groupId as number]),
   );
   const groups: PlayerGroup[] = rawGroups;
 
   const playerRows: PlayerBreakdownRow[] = buildPlayerBreakdowns(sessions);
   const groupRows: GroupBreakdownRow[] = buildGroupBreakdowns(sessions, groups, playerGroupMap);
 
-  const breakdownStats: BreakdownStatsItem[] = rawStats.map((r) => ({
-    entityType: r.entityType as "player" | "group",
+  const playerNames = new Map<number, string>(rawPlayers.map((p: RawPlayer) => [p.id, p.name]));
+  const qualifyingPlayerIds = [...getSessionsPerPlayer(sessions).entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([id]) => id);
+
+  const linearStrict = computeLinearAffects(sessions, qualifyingPlayerIds, playerNames, false);
+  const linearInclusive = computeLinearAffects(sessions, qualifyingPlayerIds, playerNames, true);
+
+  const breakdownStats: BreakdownStatsItem[] = rawStats.map(r => ({
+    entityType: r.entityType as 'player' | 'group',
     entityId: r.entityId,
     winRateCILow: r.winRateCILow,
     winRateCIHigh: r.winRateCIHigh,
@@ -61,6 +70,8 @@ export default async function BreakdownStatsPage() {
           groupRows={groupRows}
           breakdownStats={breakdownStats}
           lastRefreshedAt={user?.breakdownLastRefreshedAt?.toISOString() ?? null}
+          linearStrict={linearStrict}
+          linearInclusive={linearInclusive}
         />
       </StatsPageGuard>
     </PageWrapper>
