@@ -10,6 +10,7 @@ import {
   Tooltip,
   ReferenceLine,
   ErrorBar,
+  ResponsiveContainer,
 } from "recharts";
 import { useFormatCurrency } from "@/contexts/SettingsContext";
 import type { LinearAffectsPlayerResult } from "@/lib/computeLinearAffects";
@@ -33,11 +34,11 @@ type TooltipPayloadItem = {
 function LinearAffectsTooltip({
   active,
   payload,
-  formatProfit,
+  formatValue,
 }: {
   active?: boolean;
   payload?: TooltipPayloadItem[];
-  formatProfit: (v: number) => string;
+  formatValue: (v: number) => string;
 }) {
   if (!active || !payload?.length) return null;
   const pt = payload[0].payload;
@@ -53,20 +54,17 @@ function LinearAffectsTooltip({
     >
       <p className="mb-1 font-semibold text-zinc-200">{pt.name}</p>
       <p className="text-zinc-400">
-        Est. effect: <span className="text-zinc-200">{formatProfit(pt.mean)}</span>
+        Est. effect: <span className="text-zinc-200">{formatValue(pt.mean)}</span>
       </p>
       <p className="text-zinc-400">
         90% CI:{" "}
         <span className="text-zinc-200">
-          {formatProfit(pt.ciLow)} – {formatProfit(pt.ciHigh)}
+          {formatValue(pt.ciLow)} – {formatValue(pt.ciHigh)}
         </span>
       </p>
     </div>
   );
 }
-
-const BAR_WIDTH = 100; // px per player
-const CHART_HEIGHT = 420;
 
 function niceTickStep(range: number, targetCount = 6): number {
   const raw = range / targetCount;
@@ -87,6 +85,9 @@ function generateTicks(min: number, max: number): number[] {
   }
   return ticks;
 }
+
+const VERTICAL_BAR_WIDTH = 100;
+const HORIZONTAL_THRESHOLD = 6;
 
 export default function LinearAffectsChart({ data }: LinearAffectsChartProps) {
   const { formatCurrency } = useFormatCurrency();
@@ -115,18 +116,56 @@ export default function LinearAffectsChart({ data }: LinearAffectsChartProps) {
   const pad = (rawMax - rawMin) * 0.15 || 10;
   const domainMin = Math.min(rawMin - pad, 0);
   const domainMax = Math.max(rawMax + pad, 0);
+  const formatValue = (v: number) => (v < 0 ? `-${formatCurrency(-v)}` : formatCurrency(v));
 
+  if (data.length < HORIZONTAL_THRESHOLD) {
+    // Horizontal bar chart — suits a small number of players, no scrolling needed.
+    return (
+      <ResponsiveContainer width="100%" height={Math.max(180, sorted.length * 52)}>
+        <ComposedChart
+          layout="vertical"
+          data={chartData}
+          margin={{ top: 5, right: 70, left: 10, bottom: 5 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
+          <XAxis
+            type="number"
+            domain={[domainMin, domainMax]}
+            tick={{ fill: "#71717a", fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={formatValue}
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            tick={{ fill: "#d4d4d8", fontSize: 12 }}
+            axisLine={false}
+            tickLine={false}
+            width={90}
+          />
+          <ReferenceLine x={0} stroke="#52525b" strokeDasharray="4 2" />
+          <Tooltip content={<LinearAffectsTooltip formatValue={formatValue} />} />
+          <Bar dataKey="mean" fillOpacity={0.85} radius={[0, 3, 3, 0]} barSize={14}>
+            {chartData.map((entry, index) => (
+              <Cell key={index} fill={entry.mean >= 0 ? "#10b981" : "#f43f5e"} />
+            ))}
+            <ErrorBar dataKey="ciError" width={6} strokeWidth={2} stroke="#a1a1aa" direction="x" />
+          </Bar>
+        </ComposedChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  // Vertical bar chart with horizontal scroll — suits larger player counts.
   const ticks = generateTicks(domainMin, domainMax);
-  const formatAxisTick = (v: number) =>
-    v < 0 ? `-${formatCurrency(-v)}` : formatCurrency(v);
-
-  const chartWidth = Math.max(400, sorted.length * BAR_WIDTH);
+  const chartWidth = Math.max(400, sorted.length * VERTICAL_BAR_WIDTH);
 
   return (
     <div className="overflow-x-auto">
       <ComposedChart
         width={chartWidth}
-        height={CHART_HEIGHT}
+        height={420}
         data={chartData}
         margin={{ top: 16, right: 24, left: 8, bottom: 56 }}
       >
@@ -149,22 +188,16 @@ export default function LinearAffectsChart({ data }: LinearAffectsChartProps) {
           tick={{ fill: "#71717a", fontSize: 11 }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={formatAxisTick}
+          tickFormatter={formatValue}
           width={70}
         />
         <ReferenceLine y={0} stroke="#52525b" strokeDasharray="4 2" />
-        <Tooltip content={<LinearAffectsTooltip formatProfit={(v) => v < 0 ? `-${formatCurrency(-v)}` : formatCurrency(v)} />} />
+        <Tooltip content={<LinearAffectsTooltip formatValue={formatValue} />} />
         <Bar dataKey="mean" fillOpacity={0.85} radius={[3, 3, 0, 0]} barSize={28}>
           {chartData.map((entry, index) => (
             <Cell key={index} fill={entry.mean >= 0 ? "#10b981" : "#f43f5e"} />
           ))}
-          <ErrorBar
-            dataKey="ciError"
-            width={6}
-            strokeWidth={2}
-            stroke="#a1a1aa"
-            direction="y"
-          />
+          <ErrorBar dataKey="ciError" width={6} strokeWidth={2} stroke="#a1a1aa" direction="y" />
         </Bar>
       </ComposedChart>
     </div>

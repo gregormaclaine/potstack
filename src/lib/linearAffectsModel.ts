@@ -20,7 +20,7 @@
  *   - X must have full column rank (no two inputs perfectly correlated in the data).
  */
 
-import { Matrix, QrDecomposition, inverse } from 'ml-matrix';
+import { Matrix, QrDecomposition, inverse, SingularValueDecomposition } from 'ml-matrix';
 import tQuantile from '@stdlib/stats-base-dists-t-quantile';
 
 type Measurement = { inputs: boolean[]; output: number };
@@ -64,6 +64,15 @@ export function fitAndPredict(measurements: Measurement[], alpha: number): FitRe
   const sigma = Math.sqrt(sigma2);
 
   // (XᵀX)⁻¹ for the SE formula.
+  const CONDITION_NUMBER_THRESHOLD = 1e6;
+  const svd = new SingularValueDecomposition(X, { autoTranspose: true });
+  const s = svd.diagonal;
+  const condX = s[0] / s[s.length - 1];
+  if (condX > CONDITION_NUMBER_THRESHOLD) {
+    throw new Error(
+      `Design matrix is ill-conditioned (condition number ${condX.toFixed(0)}). Some players always appear together and their individual effects cannot be separated.`,
+    );
+  }
   const xtxInv = inverse(X.transpose().mmul(X));
 
   // Two-sided t critical value.
