@@ -60,8 +60,14 @@ export async function PUT(
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  // Delete-and-recreate player rows atomically (cascades delete SessionInvite rows too via FK)
+  // Delete-and-recreate player rows atomically (cascades delete SessionInvite rows too via FK).
+  // Also remove any session_invite_received notifications for this session — their inviteIds
+  // would otherwise be SetNull'd by the cascade, leaving orphaned "pending" notifications that
+  // can't be accepted. generateSessionInvites below will recreate them for the new invites.
   const session = await prisma.$transaction(async (tx) => {
+    await tx.notification.deleteMany({
+      where: { type: "session_invite_received", sessionId: Number(id) },
+    });
     await tx.sessionPlayer.deleteMany({ where: { sessionId: Number(id) } });
     return tx.session.update({
       where: { id: Number(id) },

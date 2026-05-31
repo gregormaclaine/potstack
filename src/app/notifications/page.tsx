@@ -48,7 +48,7 @@ export default async function InvitesPage() {
   return (
     <PageWrapper>
       <h1 className="mb-6 text-2xl font-bold text-zinc-100">Notifications</h1>
-      <NotificationsFeed notifications={notifications} myPlayers={myPlayers} />
+      <NotificationsFeed notifications={notifications} myPlayers={myPlayers} isAdmin={(session!.user!.isAdmin ?? false) || (session!.isImpersonating ?? false)} />
     </PageWrapper>
   );
 }

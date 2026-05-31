@@ -77,11 +77,23 @@ interface MyPlayer { id: number; name: string }
 interface NotificationsFeedProps {
   notifications: NotificationRow[];
   myPlayers: MyPlayer[];
+  isAdmin?: boolean;
+}
+
+function AdminIdBadge({ id }: { id: number }) {
+  return (
+    <span className="relative group inline-flex items-center justify-center h-4 w-4 rounded-full bg-zinc-800 text-[10px] text-zinc-500 hover:text-zinc-300 cursor-help">
+      #
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+        ID: {id}
+      </span>
+    </span>
+  );
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function NotificationsFeed({ notifications, myPlayers }: NotificationsFeedProps) {
+export default function NotificationsFeed({ notifications, myPlayers, isAdmin = false }: NotificationsFeedProps) {
   const [notifList, setNotifList] = useState<NotificationRow[]>(notifications);
 
   function replaceNotif(id: number, replacement: NotificationRow) {
@@ -109,6 +121,7 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
               linkId={notif.linkId ?? 0}
               myPlayers={myPlayers}
               onReplace={(n) => replaceNotif(id, n)}
+              isAdmin={isAdmin}
             />
           );
         }
@@ -121,9 +134,9 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
               key={id}
               notif={notif}
               d={d}
-              sessionId={sessionId}
               invitePending={invitePending}
               onReplace={(n) => replaceNotif(id, n)}
+              isAdmin={isAdmin}
             />
           );
         }
@@ -135,7 +148,10 @@ export default function NotificationsFeed({ notifications, myPlayers }: Notifica
                 <p className="text-sm text-zinc-300">
                   <NotificationText data={data} sessionId={sessionId} />
                 </p>
-                <p className="text-xs text-zinc-600">{timeAgo(notif.createdAt)}</p>
+                <p className="text-xs text-zinc-600 flex items-center gap-1.5">
+                  {timeAgo(notif.createdAt)}
+                  {isAdmin && <AdminIdBadge id={notif.id} />}
+                </p>
               </div>
             </div>
           </li>
@@ -187,6 +203,7 @@ function LinkRequestReceivedCard({
   linkId,
   myPlayers,
   onReplace,
+  isAdmin,
 }: {
   notif: NotificationRow;
   d: LinkRequestReceivedData;
@@ -194,6 +211,7 @@ function LinkRequestReceivedCard({
   linkId: number;
   myPlayers: { id: number; name: string }[];
   onReplace: (n: NotificationRow) => void;
+  isAdmin: boolean;
 }) {
   const [isAccepting, setIsAccepting] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<ComboboxPlayer | null>(null);
@@ -258,7 +276,10 @@ function LinkRequestReceivedCard({
             <span className="font-medium text-zinc-100">@{d.requesterUsername}</span> wants to link their player{" "}
             <span className="font-medium text-zinc-100">&ldquo;{d.playerName}&rdquo;</span> to your account
           </p>
-          <p className="text-xs text-zinc-600">{timeAgo(notif.createdAt)}</p>
+          <p className="text-xs text-zinc-600 flex items-center gap-1.5">
+            {timeAgo(notif.createdAt)}
+            {isAdmin && <AdminIdBadge id={notif.id} />}
+          </p>
         </div>
         {!linkPending && <StatusPill status={notif.link?.status ?? "PENDING"} />}
       </div>
@@ -318,15 +339,15 @@ interface InviteSessionDetail {
 function SessionInviteReceivedCard({
   notif,
   d,
-  sessionId,
   invitePending,
   onReplace,
+  isAdmin,
 }: {
   notif: NotificationRow;
   d: SessionInviteReceivedData;
-  sessionId: number | null;
   invitePending: boolean;
   onReplace: (n: NotificationRow) => void;
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   const { formatCurrency } = useFormatCurrency();
@@ -391,19 +412,24 @@ function SessionInviteReceivedCard({
         <div className="space-y-0.5">
           <p className="text-sm text-zinc-300">
             <span className="font-medium text-zinc-100">@{d.inviterUsername}</span> shared a session with you from{" "}
-            <SessionLink sessionId={sessionId} date={d.sessionDate} />
+            <span className="text-zinc-200">{formatDate(d.sessionDate)}</span>
             {d.sessionLocation && <span className="text-zinc-500"> @ {d.sessionLocation}</span>}
           </p>
-          <p className="text-xs text-zinc-600">{timeAgo(notif.createdAt)}</p>
+          <p className="text-xs text-zinc-600 flex items-center gap-1.5">
+            {timeAgo(notif.createdAt)}
+            {isAdmin && <AdminIdBadge id={notif.id} />}
+          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {!invitePending && <StatusPill status={notif.invite?.status ?? "PENDING"} />}
-          <button
-            onClick={openView}
-            className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
-          >
-            View
-          </button>
+          {!invitePending && notif.invite && <StatusPill status={notif.invite.status} />}
+          {notif.inviteId && (
+            <button
+              onClick={openView}
+              className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
+            >
+              View
+            </button>
+          )}
         </div>
       </div>
 
@@ -421,7 +447,11 @@ function SessionInviteReceivedCard({
         </div>
       )}
 
-      {!invitePending && d.profit != null && <Badge value={d.profit} />}
+      {!invitePending && notif.invite && d.profit != null && <Badge value={d.profit} />}
+
+      {!notif.inviteId && (
+        <p className="text-xs italic text-zinc-500">The invite no longer exists.</p>
+      )}
 
       <Modal open={viewOpen} onClose={() => setViewOpen(false)} title="Session Details">
         {viewLoading && <p className="text-sm text-zinc-500">Loading…</p>}
