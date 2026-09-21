@@ -11,7 +11,7 @@ import { formatPercent } from "@/lib/formatters";
 import PageWrapper from "@/components/layout/PageWrapper";
 import StatCard from "@/components/dashboard/StatCard";
 import ProfitLineChart from "@/components/dashboard/ProfitLineChart";
-import WinLossBarChart from "@/components/dashboard/WinLossBarChart";
+import WinLossCard from "@/components/dashboard/WinLossCard";
 import ProfitSpreadChart from "@/components/dashboard/ProfitSpreadChart";
 import TopPlayersChart from "@/components/dashboard/TopPlayersChart";
 import SessionBreakdownTable from "@/components/dashboard/SessionBreakdownTable";
@@ -168,12 +168,11 @@ export default async function DashboardPage({
           </h2>
           <ProfitLineChart data={stats.profitOverTime} />
         </div>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-          <h2 className="mb-3 text-sm font-semibold text-zinc-300">
-            Profit / Loss per Session
-          </h2>
-          <WinLossBarChart data={stats.winLossPerSession} />
-        </div>
+        <WinLossCard
+          key={activeEvent ? `event-${activeEvent.id}` : timeline}
+          data={stats.winLossPerSession}
+          timeline={activeEvent ? null : timeline}
+        />
       </div>
 
       {/* Charts row 2 */}

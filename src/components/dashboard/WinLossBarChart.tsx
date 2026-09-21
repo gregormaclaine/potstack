@@ -11,12 +11,18 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { formatDate } from "@/lib/formatters";
 import { useFormatCurrency } from "@/contexts/SettingsContext";
+import {
+  DEFAULT_WIN_LOSS_GROUPING,
+  groupWinLossPoints,
+  type WinLossBucket,
+  type WinLossGrouping,
+} from "@/lib/winLossGrouping";
 import type { WinLossPoint } from "@/types";
 
 interface WinLossBarChartProps {
   data: WinLossPoint[];
+  grouping?: WinLossGrouping;
 }
 
 function ProfitTooltip({
@@ -25,26 +31,35 @@ function ProfitTooltip({
 }: {
   active?: boolean;
   label?: string;
-  payload?: Array<{ value?: number; payload?: WinLossPoint }>;
+  payload?: Array<{ value?: number; payload?: WinLossBucket }>;
 }) {
   const { formatCurrency } = useFormatCurrency();
   if (!active || !payload?.length) return null;
 
   const value = Number(payload[0]?.value ?? 0);
-  const date = payload[0]?.payload?.date;
+  const label = payload[0]?.payload?.label;
   const color = value >= 0 ? "#10b981" : "#ef4444";
 
   return (
     <div className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm shadow-lg">
-      {date && <div className="mb-1 text-zinc-400">{formatDate(date)}</div>}
+      {label && <div className="mb-1 text-zinc-400">{label}</div>}
       <div style={{ color }}>{formatCurrency(value)}</div>
     </div>
   );
 }
 
-export default function WinLossBarChart({ data }: WinLossBarChartProps) {
+export default function WinLossBarChart({
+  data,
+  grouping = DEFAULT_WIN_LOSS_GROUPING,
+}: WinLossBarChartProps) {
   const { formatCurrency } = useFormatCurrency();
-  if (data.length === 0) {
+  const buckets = groupWinLossPoints(data, grouping);
+
+  // Ticks are looked up by category value rather than index, since recharts
+  // drops ticks when the bars get crowded.
+  const tickByKey = new Map(buckets.map((b) => [b.key, b.tick]));
+
+  if (buckets.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-zinc-500">
         No data yet
@@ -54,12 +69,14 @@ export default function WinLossBarChart({ data }: WinLossBarChartProps) {
 
   return (
     <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+      <BarChart
+        data={buckets}
+        margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
+      >
         <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
         <XAxis
-          dataKey="sessionId"
-          tickFormatter={(v, i) => formatDate(data[i]?.date ?? v, "d MMM")}
-
+          dataKey="key"
+          tickFormatter={(v: string) => tickByKey.get(v) ?? v}
           tick={{ fill: "#71717a", fontSize: 11 }}
           axisLine={{ stroke: "#27272a" }}
           tickLine={false}
@@ -74,9 +91,9 @@ export default function WinLossBarChart({ data }: WinLossBarChartProps) {
         <Tooltip content={<ProfitTooltip />} />
         <ReferenceLine y={0} stroke="#52525b" />
         <Bar dataKey="profit" radius={[3, 3, 0, 0]}>
-          {data.map((entry, i) => (
+          {buckets.map((entry) => (
             <Cell
-              key={i}
+              key={entry.key}
               fill={entry.profit >= 0 ? "#10b981" : "#ef4444"}
               fillOpacity={0.85}
             />
