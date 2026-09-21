@@ -17,11 +17,11 @@ export const DEFAULT_WIN_LOSS_GROUPING: WinLossGrouping = "session";
 
 /**
  * Which groupings make sense for the dashboard's current date filter. A null
- * timeline means an event is selected, which can span any range, so all
- * groupings are offered. An empty list means the selector should be hidden.
+ * timeline means an event is selected, which is always per-session. An empty
+ * list means the selector should be hidden.
  */
 export function allowedGroupings(timeline: Timeline | null): WinLossGrouping[] {
-  if (timeline === null || timeline === "all" || timeline === "ytd") {
+  if (timeline === "all" || timeline === "ytd") {
     return ["session", "week", "month"];
   }
   if (timeline === "last-3-months") return ["session", "week"];
